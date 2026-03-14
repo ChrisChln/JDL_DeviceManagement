@@ -451,6 +451,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 .table-shell { overflow: auto; }
 .grid-table { width: 100%; border-collapse: collapse; min-width: 980px; }
+.device-table { min-width: 1280px; }
 .grid-table th,
 .grid-table td {
   padding: var(--space-4) var(--space-5);
