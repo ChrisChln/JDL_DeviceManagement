@@ -1,0 +1,263 @@
+﻿<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Premium Maintenance Records - Swiss Spa</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#19e5e6",
+                        "background-light": "#f6f8f8",
+                        "background-dark": "#112121",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
+<div class="relative flex h-auto min-h-screen w-full flex-col overflow-x-hidden">
+<!-- Top Navigation -->
+<header class="flex items-center justify-between border-b border-primary/10 bg-white dark:bg-background-dark px-6 md:px-10 py-4 sticky top-0 z-50">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-3">
+<div class="size-8 flex items-center justify-center bg-primary text-background-dark rounded-lg">
+<span class="material-symbols-outlined text-2xl">spa</span>
+</div>
+<h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold tracking-tight">Swiss Spa</h2>
+</div>
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-slate-600 dark:text-slate-400 hover:text-primary text-sm font-medium transition-colors" href="#">Overview</a>
+<a class="text-primary text-sm font-medium border-b-2 border-primary py-1" href="#">Records</a>
+<a class="text-slate-600 dark:text-slate-400 hover:text-primary text-sm font-medium transition-colors" href="#">Assets</a>
+<a class="text-slate-600 dark:text-slate-400 hover:text-primary text-sm font-medium transition-colors" href="#">Reports</a>
+</nav>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden sm:block relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+<input class="w-64 bg-slate-100 dark:bg-slate-800 border-none rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-1 focus:ring-primary outline-none" placeholder="Search records..."/>
+</div>
+<div class="flex items-center gap-3">
+<div class="h-8 w-px bg-slate-200 dark:bg-slate-800"></div>
+<div class="bg-primary/10 border border-primary/20 rounded-full size-10 flex items-center justify-center overflow-hidden" data-alt="Profile placeholder with teal abstract pattern">
+<span class="material-symbols-outlined text-primary">person</span>
+</div>
+</div>
+</div>
+</header>
+<main class="flex-1 flex flex-col max-w-7xl mx-auto w-full px-6 md:px-10 py-8">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10">
+<div class="flex flex-col gap-2">
+<h1 class="text-4xl font-black text-slate-900 dark:text-slate-100 tracking-tight">Maintenance Records</h1>
+<p class="text-slate-500 dark:text-slate-400 text-lg">Swiss Spa Minimalist Collection Management</p>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center gap-2 rounded-lg h-11 px-6 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
+<span class="material-symbols-outlined text-lg">download</span>
+                    Export PDF
+                </button>
+<button class="flex items-center gap-2 rounded-lg h-11 px-6 bg-primary text-background-dark font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-lg">add</span>
+                    Add Record
+                </button>
+</div>
+</div>
+<!-- Stats Overview -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
+<div class="flex flex-col gap-3 rounded-xl p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Total Events</p>
+<div class="flex items-baseline gap-2">
+<p class="text-3xl font-bold text-slate-900 dark:text-slate-100">128</p>
+<span class="text-emerald-500 text-sm font-bold flex items-center gap-0.5">
+<span class="material-symbols-outlined text-xs">trending_up</span> 5%
+                    </span>
+</div>
+</div>
+<div class="flex flex-col gap-3 rounded-xl p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Annual Cost</p>
+<div class="flex items-baseline gap-2">
+<p class="text-3xl font-bold text-slate-900 dark:text-slate-100">CHF 12,450</p>
+<span class="text-rose-500 text-sm font-bold flex items-center gap-0.5">
+<span class="material-symbols-outlined text-xs">trending_up</span> 2%
+                    </span>
+</div>
+</div>
+<div class="flex flex-col gap-3 rounded-xl p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">System Uptime</p>
+<div class="flex items-baseline gap-2">
+<p class="text-3xl font-bold text-slate-900 dark:text-slate-100">99.8%</p>
+<span class="text-emerald-500 text-sm font-bold flex items-center gap-0.5">
+<span class="material-symbols-outlined text-xs">check_circle</span>
+</span>
+</div>
+</div>
+</div>
+<!-- Maintenance Table Container -->
+<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Date</th>
+<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Serial Number</th>
+<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Maintenance Issue</th>
+<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Provider</th>
+<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cost</th>
+<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+<!-- Row 1 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-5 text-sm font-medium text-slate-600 dark:text-slate-400">Oct 24, 2023</td>
+<td class="px-6 py-5 text-sm font-bold text-slate-900 dark:text-slate-100">SN-88291</td>
+<td class="px-6 py-5 text-sm text-slate-900 dark:text-slate-100">
+<div class="flex flex-col">
+<span class="font-medium">Filter Replacement</span>
+<span class="text-xs text-slate-500">Regular quarterly maintenance</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+                                    Certified Tech
+                                </span>
+</td>
+<td class="px-6 py-5 text-sm font-bold text-slate-900 dark:text-slate-100">CHF 450.00</td>
+<td class="px-6 py-5">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-5 text-sm font-medium text-slate-600 dark:text-slate-400">Sep 12, 2023</td>
+<td class="px-6 py-5 text-sm font-bold text-slate-900 dark:text-slate-100">SN-11022</td>
+<td class="px-6 py-5 text-sm text-slate-900 dark:text-slate-100">
+<div class="flex flex-col">
+<span class="font-medium">Thermostat Calibration</span>
+<span class="text-xs text-slate-500">Inaccurate temperature readings fixed</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                                    Swiss Spa Care
+                                </span>
+</td>
+<td class="px-6 py-5 text-sm font-bold text-slate-900 dark:text-slate-100">CHF 220.00</td>
+<td class="px-6 py-5">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-5 text-sm font-medium text-slate-600 dark:text-slate-400">Aug 05, 2023</td>
+<td class="px-6 py-5 text-sm font-bold text-slate-900 dark:text-slate-100">SN-88291</td>
+<td class="px-6 py-5 text-sm text-slate-900 dark:text-slate-100">
+<div class="flex flex-col">
+<span class="font-medium">Deep Clean &amp; Sanitization</span>
+<span class="text-xs text-slate-500">Annual professional deep cleaning</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                                    Elite Spas
+                                </span>
+</td>
+<td class="px-6 py-5 text-sm font-bold text-slate-900 dark:text-slate-100">CHF 850.00</td>
+<td class="px-6 py-5">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-5 text-sm font-medium text-slate-600 dark:text-slate-400">Jul 15, 2023</td>
+<td class="px-6 py-5 text-sm font-bold text-slate-900 dark:text-slate-100">SN-44300</td>
+<td class="px-6 py-5 text-sm text-slate-900 dark:text-slate-100">
+<div class="flex flex-col">
+<span class="font-medium">Pump Seal Repair</span>
+<span class="text-xs text-slate-500">Leak detected in secondary pump</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+                                    Certified Tech
+                                </span>
+</td>
+<td class="px-6 py-5 text-sm font-bold text-slate-900 dark:text-slate-100">CHF 1,200.00</td>
+<td class="px-6 py-5">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination Footer -->
+<div class="px-6 py-4 flex items-center justify-between border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
+<span class="text-sm text-slate-500 dark:text-slate-400">Showing 1 to 4 of 128 results</span>
+<div class="flex gap-2">
+<button class="p-2 rounded border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 transition-all">
+<span class="material-symbols-outlined text-sm">chevron_left</span>
+</button>
+<button class="p-2 rounded border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 transition-all">
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- System Alerts / Notifications -->
+<div class="mt-8 flex flex-col md:flex-row gap-6">
+<div class="flex-1 p-5 rounded-xl bg-primary/5 border border-primary/10 flex items-start gap-4">
+<div class="bg-primary text-background-dark p-2 rounded-lg">
+<span class="material-symbols-outlined">event_upcoming</span>
+</div>
+<div>
+<h4 class="font-bold text-slate-900 dark:text-slate-100">Next Scheduled Maintenance</h4>
+<p class="text-sm text-slate-600 dark:text-slate-400 mt-1">Full system diagnostic scheduled for November 15, 2023 with Certified Tech.</p>
+</div>
+</div>
+<div class="flex-1 p-5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-start gap-4">
+<div class="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 p-2 rounded-lg">
+<span class="material-symbols-outlined">inventory_2</span>
+</div>
+<div>
+<h4 class="font-bold text-slate-900 dark:text-slate-100">Low Filter Inventory</h4>
+<p class="text-sm text-slate-600 dark:text-slate-400 mt-1">Only 2 spare filters remaining. Consider restocking for the next cycle.</p>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="mt-12 py-8 border-t border-slate-200 dark:border-slate-800 text-center">
+<p class="text-sm text-slate-400">© 2023 Swiss Spa Management Systems. All rights reserved.</p>
+</footer>
+</div>
+</body></html>

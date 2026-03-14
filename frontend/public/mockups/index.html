@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Swiss Spa - Premium Asset Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#19e5e6",
+                        "background-light": "#f6f8f8",
+                        "background-dark": "#112121",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .sidebar-item-active {
+            background-color: rgba(25, 229, 230, 0.1);
+            border-right: 2px solid #19e5e6;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
+<div class="flex min-h-screen">
+<aside class="w-64 border-r border-primary/10 bg-white dark:bg-background-dark/50 flex flex-col fixed h-full">
+<div class="p-6 flex items-center gap-3 border-b border-primary/5">
+<div class="size-8 bg-primary flex items-center justify-center rounded-lg">
+<span class="material-symbols-outlined text-background-dark">spa</span>
+</div>
+<h1 class="text-sm font-black tracking-widest uppercase">Swiss Spa Mgmt</h1>
+</div>
+<nav class="flex-1 py-6">
+<div class="px-4 mb-4">
+<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3 mb-2">Main Console</p>
+<div class="space-y-1">
+<a class="sidebar-item-active flex items-center gap-3 px-3 py-2.5 text-slate-900 dark:text-primary transition-colors" href="./index.html" id="nav-overview">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-sm font-medium">Overview</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-500 hover:text-primary transition-colors" href="./Inventory.html" id="nav-assets">
+<span class="material-symbols-outlined">domain</span>
+<span class="text-sm font-medium">Assets</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-500 hover:text-primary transition-colors" href="./maintenance.html" id="nav-maintenance-main">
+<span class="material-symbols-outlined">contract</span>
+<span class="text-sm font-medium">Maintenance</span>
+</a>
+</div>
+</div>
+<div class="px-4 mb-4">
+<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3 mb-2">Operations</p>
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-500 hover:text-primary transition-colors" href="./maintenance.html" id="nav-maintenance-ops">
+<span class="material-symbols-outlined">build</span>
+<span class="text-sm font-medium">Maintenance</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-500 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">bar_chart</span>
+<span class="text-sm font-medium">Reports</span>
+</a>
+</div>
+</div>
+</nav>
+<div class="p-4 border-t border-primary/5">
+<button class="w-full bg-primary hover:bg-primary/90 text-background-dark py-2.5 rounded text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">add</span>
+                    New Asset
+                </button>
+</div>
+</aside>
+<main class="flex-1 ml-64 min-h-screen">
+<header class="h-16 border-b border-primary/5 bg-white/80 backdrop-blur-md sticky top-0 z-10 flex items-center justify-between px-8">
+<div class="flex items-center gap-4 flex-1">
+<div class="relative w-full max-w-md">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+<input class="w-full bg-slate-100 border-none rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-1 focus:ring-primary" placeholder="Search portfolio..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<button class="relative text-slate-500 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-0 right-0 size-2 bg-red-500 rounded-full border-2 border-white"></span>
+</button>
+<button class="text-slate-500 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="flex items-center gap-3 pl-6 border-l border-slate-200">
+<div class="text-right">
+<p class="text-xs font-bold leading-none" id="user-name">Hans Mueller</p>
+<p class="text-[10px] text-slate-400 uppercase" id="user-meta">Portfolio Lead</p>
+</div>
+<button class="text-slate-500 hover:text-primary transition-colors" id="logout-button" title="Sign Out" type="button">
+<span class="material-symbols-outlined">logout</span>
+</button>
+<div class="size-8 rounded-full overflow-hidden bg-slate-200">
+<img class="w-full h-full object-cover" data-alt="Portrait of Swiss male executive" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2NOXI1MkE_8C6dC9AAQwq9Acs1ckVbai9wBYxnqaMClHfDuU7Ar0lFvsN54kb2JvnJ-K8TXfNUwZ48LPcVoQdx-mC_UySDU4jYbKurciYGbfmc1X0BgUi8qBVZRLq5UFCnFOlBLwaNGgiZLoxCqjPnSdHzux6IE2U6_Hmm_XpLreAP-HsXOQxz8D5AitVLPoLEDvmgMDq4xH_FhlpWjddwjA22SmmlgNcxfbJDG17ilnohQV9BG6lFcHGOWF8UsP8Yx96lI17KMaq"/>
+</div>
+</div>
+</div>
+</header>
+<div class="p-8 max-w-7xl mx-auto">
+<div class="mb-8">
+<h2 class="text-3xl font-black tracking-tight mb-1 text-slate-900">Portfolio Overview</h2>
+<p class="text-slate-500 font-medium">Real-time performance across Swiss luxury spas.</p>
+</div>
+<div class="grid grid-cols-3 gap-6 mb-8">
+<div class="bg-white p-6 rounded border border-primary/5 shadow-sm">
+<div class="flex justify-between items-start mb-4">
+<div class="size-10 rounded bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">contract</span>
+</div>
+<span class="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded">+0.4%</span>
+</div>
+<p class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Active Leases</p>
+<h3 class="text-2xl font-black text-slate-900">98.2%</h3>
+<div class="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+<div class="h-full bg-primary" style="width: 98.2%"></div>
+</div>
+</div>
+<div class="bg-white p-6 rounded border border-primary/5 shadow-sm">
+<div class="flex justify-between items-start mb-4">
+<div class="size-10 rounded bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">water_drop</span>
+</div>
+<span class="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded">-2.1%</span>
+</div>
+<p class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Water Usage</p>
+<h3 class="text-2xl font-black text-slate-900">420 m³</h3>
+<p class="text-[10px] text-slate-400 mt-2 italic">Consumption vs previous period</p>
+</div>
+<div class="bg-white p-6 rounded border border-primary/5 shadow-sm">
+<div class="flex justify-between items-start mb-4">
+<div class="size-10 rounded bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">engineering</span>
+</div>
+<span class="text-[10px] font-bold text-primary bg-primary/5 px-2 py-0.5 rounded">Priority</span>
+</div>
+<p class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Maintenance</p>
+<h3 class="text-2xl font-black text-slate-900">12 Open</h3>
+<p class="text-[10px] text-slate-400 mt-2 font-medium">3 Scheduled for completion today</p>
+</div>
+</div>
+<div class="grid grid-cols-12 gap-8">
+<div class="col-span-8">
+<div class="bg-white rounded border border-primary/5 shadow-sm overflow-hidden">
+<div class="p-6 border-b border-primary/5 flex justify-between items-center">
+<h3 class="font-bold text-lg">Urgent Reminders</h3>
+<button class="text-xs font-bold text-primary uppercase tracking-widest hover:underline">View All</button>
+</div>
+<div class="divide-y divide-slate-100">
+<div class="p-5 flex items-center gap-4 hover:bg-slate-50 transition-colors cursor-pointer">
+<div class="size-2 rounded-full bg-red-500"></div>
+<div class="flex-1">
+<p class="text-sm font-bold text-slate-900">Lease Renewal: St. Moritz Alpine Spa</p>
+<p class="text-xs text-slate-400">Expires in 72 hours</p>
+</div>
+<div class="text-right">
+<p class="text-xs font-medium text-slate-500">Today, 09:00</p>
+</div>
+</div>
+<div class="p-5 flex items-center gap-4 hover:bg-slate-50 transition-colors cursor-pointer">
+<div class="size-2 rounded-full bg-orange-400"></div>
+<div class="flex-1">
+<p class="text-sm font-bold text-slate-900">Critical: Water Filter Replacement</p>
+<p class="text-xs text-slate-400">Zermatt Wellness Center - Unit 4B</p>
+</div>
+<div class="text-right">
+<p class="text-xs font-medium text-slate-500">Yesterday</p>
+</div>
+</div>
+<div class="p-5 flex items-center gap-4 hover:bg-slate-50 transition-colors cursor-pointer">
+<div class="size-2 rounded-full bg-blue-400"></div>
+<div class="flex-1">
+<p class="text-sm font-bold text-slate-900">Safety Inspection Required</p>
+<p class="text-xs text-slate-400">Geneva Lakeview Hydrotherapy</p>
+</div>
+<div class="text-right">
+<p class="text-xs font-medium text-slate-500">Oct 24</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="col-span-4 space-y-6">
+<div class="bg-background-dark text-white p-6 rounded shadow-lg relative overflow-hidden">
+<div class="absolute -right-10 -bottom-10 size-40 bg-primary/20 rounded-full blur-3xl"></div>
+<div class="relative z-10">
+<h3 class="text-sm font-bold text-primary uppercase tracking-widest mb-4">Today's Status</h3>
+<div class="space-y-4">
+<div class="flex justify-between items-center border-b border-white/10 pb-2">
+<span class="text-xs text-slate-300">Weather (Alps)</span>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">cloud</span>
+<span class="text-xs font-bold">-4°C</span>
+</div>
+</div>
+<div class="flex justify-between items-center border-b border-white/10 pb-2">
+<span class="text-xs text-slate-300">Staff On-duty</span>
+<span class="text-xs font-bold">142</span>
+</div>
+<div class="flex justify-between items-center border-b border-white/10 pb-2">
+<span class="text-xs text-slate-300">System Load</span>
+<span class="text-xs font-bold text-green-400">Optimal</span>
+</div>
+</div>
+<div class="mt-6">
+<p class="text-[10px] text-slate-400 leading-relaxed italic">"Excellence is not an act, but a habit. Keep the standard high."</p>
+</div>
+</div>
+</div>
+<div class="bg-white p-6 rounded border border-primary/5 shadow-sm">
+<h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Regional Distribution</h3>
+<div class="space-y-3">
+<div class="flex items-center gap-3">
+<div class="size-2 rounded-full bg-primary"></div>
+<span class="text-xs font-bold flex-1">Zurich Region</span>
+<span class="text-xs font-medium">42%</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="size-2 rounded-full bg-primary/60"></div>
+<span class="text-xs font-bold flex-1">Bern Region</span>
+<span class="text-xs font-medium">28%</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="size-2 rounded-full bg-primary/30"></div>
+<span class="text-xs font-bold flex-1">Swiss Alps</span>
+<span class="text-xs font-medium">30%</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<script>
+  (function () {
+    const params = new URLSearchParams(window.location.search);
+    const email = params.get("email") || "";
+    const shortName = email ? email.split("@")[0] : "Hans Mueller";
+    const nextQuery = email ? "?email=" + encodeURIComponent(email) : "";
+    const nameNode = document.getElementById("user-name");
+    const metaNode = document.getElementById("user-meta");
+    if (nameNode) nameNode.textContent = shortName;
+    if (metaNode) metaNode.textContent = email || "Portfolio Lead";
+    ["nav-overview", "nav-assets", "nav-maintenance-main", "nav-maintenance-ops"].forEach((id) => {
+      const link = document.getElementById(id);
+      if (!link) return;
+      const url = new URL(link.getAttribute("href"), window.location.href);
+      link.setAttribute("href", url.pathname.split("/").pop() + nextQuery);
+    });
+    const logoutButton = document.getElementById("logout-button");
+    if (logoutButton) {
+      logoutButton.addEventListener("click", function () {
+        if (window.parent !== window) {
+          window.parent.postMessage({ type: "mockup:logout" }, "*");
+        }
+      });
+    }
+  })();
+</script>
+</body></html>
