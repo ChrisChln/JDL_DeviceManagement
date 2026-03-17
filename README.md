@@ -85,6 +85,46 @@ npm run dev
 - 前端：`http://localhost:5174`
 - 后端：`http://localhost:3101`
 
+## 一键安装（install）
+
+在项目根目录执行：
+
+```bash
+chmod +x scripts/install.sh scripts/deploy-host.sh
+./scripts/install.sh
+```
+
+该脚本会执行：
+
+- 自动检测并安装 Node.js 20（仅 Debian/Ubuntu + root 场景）
+- `npm ci` 安装依赖
+- `npm run build` 构建前端
+- `node --check` 与前端测试校验
+
+## 主机部署（host）
+
+> 适用于 Debian/Ubuntu 服务器，需 root 权限。
+
+```bash
+sudo DOMAIN=your.domain.com APP_DIR=/opt/jdl-device-management BACKEND_PORT=3101 ./scripts/deploy-host.sh
+```
+
+部署脚本会自动完成：
+
+- 安装 `nginx`、`rsync`
+- 将项目同步到 `APP_DIR`
+- 执行 `npm ci` 和 `npm run build`
+- 生成并启动 `systemd` 服务：`jdl-device-management.service`
+- 写入 Nginx 配置并代理 `/api` 到后端
+
+可选参数：
+
+- `DOMAIN`：Nginx `server_name`，默认 `_`
+- `APP_DIR`：部署目录，默认 `/opt/jdl-device-management`
+- `BACKEND_PORT`：后端端口，默认 `3101`
+- `SERVICE_USER`：服务运行用户，默认 `www-data`
+- `FORCE_COPY=1`：覆盖非空部署目录
+
 ## 构建
 
 ```powershell
