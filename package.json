@@ -13,7 +13,9 @@
     "dev:backend": "npm run dev -w backend",
     "build": "npm run build -w frontend",
     "start": "npm run start -w backend",
-    "install:deps": "npm install"
+    "install:deps": "npm install",
+    "check:conflicts": "node scripts/mergeConflictCheck.js",
+    "test:conflicts": "node --test scripts/mergeConflictCheck.test.js"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
