@@ -73,16 +73,16 @@ supabase/schema.sql
 
 ## 本地开发
 
-根目录执行：
+根目录执行（Windows 用户请在 Git Bash 或 WSL 等支持 bash 的终端中运行）：
 
-```powershell
+```bash
 npm install
 npm run dev
 ```
 
 如需对外暴露前端开发服务器：
 
-```powershell
+```bash
 npm run dev -- --host
 ```
 
