@@ -6,17 +6,22 @@ import { requireAuth } from "./auth-middleware.js";
 import { config } from "./config.js";
 import {
   deleteAsset,
+  getLaborScheduleByDate,
   deleteMaintenanceRecord,
   insertMaintenanceRecord,
+  listLaborSchedules,
   listAssets,
   listMaintenanceRecords,
   updateAsset,
+  upsertLaborSchedule,
   upsertAsset,
 } from "./repository.js";
+import { normalizeLaborSchedulePayload } from "./schedule-utils.js";
 import {
   computeAssetStatus,
   formatDateInput,
   normalizeAssetPayload,
+  normalizeDate,
   normalizeMaintenancePayload,
 } from "./utils.js";
 
@@ -171,6 +176,48 @@ app.delete("/api/maintenance-records/:id", async (req, res, next) => {
   try {
     await deleteMaintenanceRecord(req.params.id);
     res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/labor-schedules", async (req, res, next) => {
+  try {
+    const startDate = req.query.startDate ? normalizeDate(req.query.startDate) : null;
+    const endDate = req.query.endDate ? normalizeDate(req.query.endDate) : null;
+    if (req.query.startDate && !startDate) {
+      return res.status(400).json({ message: "Invalid startDate format, expected YYYY-MM-DD" });
+    }
+    if (req.query.endDate && !endDate) {
+      return res.status(400).json({ message: "Invalid endDate format, expected YYYY-MM-DD" });
+    }
+    res.json(await listLaborSchedules({ startDate, endDate }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/labor-schedules/:planDate", async (req, res, next) => {
+  try {
+    const planDate = normalizeDate(req.params.planDate);
+    if (!planDate) return res.status(400).json({ message: "Invalid planDate format, expected YYYY-MM-DD" });
+
+    const record = await getLaborScheduleByDate(planDate);
+    if (!record) return res.status(404).json({ message: "Schedule not found" });
+    res.json(record);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/labor-schedules/:planDate", async (req, res, next) => {
+  try {
+    const planDate = normalizeDate(req.params.planDate);
+    if (!planDate) return res.status(400).json({ message: "Invalid planDate format, expected YYYY-MM-DD" });
+
+    const payload = normalizeLaborSchedulePayload({ ...req.body, plan_date: planDate });
+    const record = await upsertLaborSchedule(payload);
+    res.json(record);
   } catch (error) {
     next(error);
   }

@@ -150,9 +150,25 @@ npm run build
 - `GET /api/maintenance-records`
 - `POST /api/maintenance-records`
 - `DELETE /api/maintenance-records/:id`
+- `GET /api/labor-schedules?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`
+- `GET /api/labor-schedules/:planDate`
+- `PUT /api/labor-schedules/:planDate`
 
 ## 下一步建议
 
 - 把“扫码后已加水”做成移动端扫码流程
 - 增加图片上传到 Supabase Storage
 - 增加用户角色和仓库级权限控制
+
+## 常见问题：为什么页面刷新后数据丢失
+
+如果你访问的是根目录下的原型页面（例如 `admin.html`、`index.html`、`maintenance.html`、`Inventory.html` 对应的旧脚本），这套逻辑不会走后端 API。
+
+- 旧原型脚本使用 `localStorage` 持久化（见 `app.js` 里的 `readLocalDb` / `persistLocalDb`）。
+- 只有 `frontend/`（React）+ `backend/`（Express）这条链路，才会把数据写入 Supabase。
+
+因此出现“刷新后为空、数据库没有数据”时，优先检查：
+
+1. 是否在使用旧原型页面而不是 `frontend` 应用入口。
+2. 是否走了 `/api/*` 请求并由后端入库。
+3. 当前域名/端口是否变化导致读到不同的 `localStorage` 命名空间。

@@ -91,3 +91,36 @@ select
   case when a.last_watered_at is null then null else (a.last_watered_at + a.water_interval_days) - current_date end as water_days_until,
   case when a.last_maintained_at is null then null else (a.last_maintained_at + a.maintenance_interval_days) - current_date end as maintenance_days_until
 from public.assets a;
+
+create table if not exists public.labor_schedules (
+  id uuid primary key default gen_random_uuid(),
+  plan_date date not null unique,
+  template_version text,
+  day_shift_forecast numeric(12, 2) check (day_shift_forecast is null or day_shift_forecast >= 0),
+  night_shift_forecast numeric(12, 2) check (night_shift_forecast is null or night_shift_forecast >= 0),
+  actual_day_shift numeric(12, 2) check (actual_day_shift is null or actual_day_shift >= 0),
+  actual_night_shift numeric(12, 2) check (actual_night_shift is null or actual_night_shift >= 0),
+  toc_labor jsonb not null default '{}'::jsonb,
+  notes text,
+  updated_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_labor_schedules_plan_date on public.labor_schedules(plan_date);
+
+drop trigger if exists trg_labor_schedules_updated_at on public.labor_schedules;
+create trigger trg_labor_schedules_updated_at
+before update on public.labor_schedules
+for each row
+execute function public.set_updated_at();
+
+alter table public.labor_schedules enable row level security;
+
+drop policy if exists "Allow authenticated access to labor_schedules" on public.labor_schedules;
+create policy "Allow authenticated access to labor_schedules"
+on public.labor_schedules
+for all
+to authenticated
+using (true)
+with check (true);
