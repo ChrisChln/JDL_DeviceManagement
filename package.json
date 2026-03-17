@@ -18,8 +18,5 @@
     "install:deps": "npm install",
     "check:conflicts": "node scripts/mergeConflictCheck.js",
     "test:conflicts": "node --test scripts/mergeConflictCheck.test.js"
-  },
-  "devDependencies": {
-    "concurrently": "^9.2.1"
   }
 }
