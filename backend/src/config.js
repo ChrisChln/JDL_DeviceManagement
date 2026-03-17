@@ -16,8 +16,8 @@ export const config = {
 
 export function assertConfig() {
   const missing = [];
-  if (!config.supabaseUrl) missing.push("SUPABASE_URL");
-  if (!config.supabaseSecretKey) missing.push("SUPABASE_SECRET_KEY");
+  if (!config.supabaseUrl) missing.push("SUPABASE_URL or VITE_SUPABASE_URL");
+  if (!config.supabaseSecretKey) missing.push("SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY");
   if (missing.length) {
     throw new Error(`Missing environment variables: ${missing.join(", ")}`);
   }
