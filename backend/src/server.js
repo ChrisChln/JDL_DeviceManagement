@@ -121,27 +121,40 @@ app.post("/api/assets/import", upload.single("file"), async (req, res, next) => 
     const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
     const results = [];
 
-    for (const row of rows) {
-      const asset = await upsertAsset(
-        normalizeAssetPayload({
-          warehouse: row["仓库"] || row.warehouse,
-          model: row["车型"] || row.model,
-          serial_number: row["序列号"] || row.serial_number,
-          brand: row["品牌"] || row.brand,
-          supplier: row["供应商"] || row.supplier,
-          status: row["状态"] || row.status,
-          monthly_rent: row["月租"] || row.monthly_rent,
-          lease_start_date: row["起租日期"] || row.lease_start_date,
-          lease_end_date: row["到期日期"] || row.lease_end_date,
-          lease_resolution: row["到期处理方式"] || row.lease_resolution,
-          last_watered_at: row["上次加水日期"] || row.last_watered_at,
-          water_interval_days: row["加水周期"] || row.water_interval_days,
-          last_maintained_at: row["上次保养日期"] || row.last_maintained_at,
-          maintenance_interval_days: row["保养周期"] || row.maintenance_interval_days,
-          notes: row["备注"] || row.notes,
-        }),
-      );
-      results.push(asset);
+    for (const [index, row] of rows.entries()) {
+      try {
+        const asset = await upsertAsset(
+          normalizeAssetPayload({
+            warehouse: row["仓库"] || row.warehouse,
+            model: row["车型"] || row.model,
+            serial_number: row["序列号"] || row.serial_number,
+            brand: row["叉车品牌"] || row["品牌"] || row.brand,
+            supplier: row["供应商"] || row.supplier,
+            status: row["状态"] || row.status,
+            monthly_rent: row["月租"] || row.monthly_rent,
+            is_purchase_ordered:
+              row["是否采购下单"] ?? row.is_purchase_ordered,
+            lease_start_date: row["起租日期"] || row.lease_start_date,
+            lease_end_date: row["到期日期"] || row.lease_end_date,
+            lease_resolution:
+              row["后期处理方式"] ||
+              row["到期处理方式"] ||
+              row.lease_resolution,
+            operation_requirement:
+              row["运营需求"] || row.operation_requirement,
+            current_status: row["目前状态"] || row.current_status,
+            issue_feedback: row["问题反馈"] || row.issue_feedback,
+            last_watered_at: row["上次加水日期"] || row.last_watered_at,
+            water_interval_days: row["加水周期"] || row.water_interval_days,
+            last_maintained_at: row["上次保养日期"] || row.last_maintained_at,
+            maintenance_interval_days: row["保养周期"] || row.maintenance_interval_days,
+            notes: row["备注"] || row.notes,
+          }),
+        );
+        results.push(asset);
+      } catch (error) {
+        throw new Error(`第 ${index + 2} 行导入失败：${error.message}`);
+      }
     }
 
     res.status(201).json({ count: results.length });

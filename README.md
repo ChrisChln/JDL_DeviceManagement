@@ -34,24 +34,13 @@
 
 ## 环境变量
 
-复制 `backend/.env.example` 为 `backend/.env`，填写：
+复制根目录 `.env.example` 为根目录 `.env`，填写：
 
 ```env
 PORT=3101
 SUPABASE_URL=https://your-project-id.supabase.co
 SUPABASE_SECRET_KEY=your-secret-key
 CORS_ORIGIN=http://localhost:5174
-```
-
-说明：
-
-- 这里使用新的 `Secret key`
-- 后端通过 `Secret key` 访问 Supabase
-- 代码仍兼容旧的 `SUPABASE_SERVICE_ROLE_KEY`，但建议切到新命名
-
-复制 `frontend/.env.example` 为 `frontend/.env`，填写：
-
-```env
 VITE_API_BASE_URL=http://localhost:3101
 VITE_SUPABASE_URL=https://your-project-id.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
@@ -59,7 +48,10 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 
 说明：
 
+- 前后端都从根目录 `.env` 读取配置
 - 前端只用 `Publishable key` 做登录
+- 后端通过 `Secret key` 访问 Supabase
+- 代码仍兼容旧的 `SUPABASE_SERVICE_ROLE_KEY`，但建议切到新命名
 - 前端不再直接查询数据表
 
 ## 初始化数据库
