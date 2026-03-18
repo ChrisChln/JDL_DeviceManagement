@@ -41,11 +41,20 @@ const recordSeed = {
   provider: "",
   photo_url: "",
 };
+const transferSeed = {
+  asset_ids: [],
+  from_warehouse: "",
+  to_warehouse: "",
+  reason: "",
+  note: "",
+};
 const nav = [
   { id: "dashboard", label: "首页概览", icon: "dashboard" },
   { id: "assets", label: "资产台账", icon: "domain" },
+  { id: "transfers", label: "资产调拨", icon: "swap_horiz" },
   { id: "devices", label: "设备管理", icon: "devices" },
   { id: "maintenance", label: "维修记录", icon: "build" },
+  { id: "logs", label: "操作日志", icon: "history" },
 ];
 const statuses = ["租赁", "月租", "自有", "维修中", "闲置"];
 const exportColumns = [
@@ -97,6 +106,11 @@ export default function App() {
   const [view, setView] = useState("dashboard");
   const [assets, setAssets] = useState([]);
   const [records, setRecords] = useState([]);
+  const [transferRecords, setTransferRecords] = useState([]);
+  const [profile, setProfile] = useState(null);
+  const [operationLogs, setOperationLogs] = useState([]);
+  const [profileForm, setProfileForm] = useState({ full_name: "" });
+  const [profileSaving, setProfileSaving] = useState(false);
   const [filters, setFilters] = useState({
     search: "",
     warehouse: "",
@@ -108,9 +122,11 @@ export default function App() {
   const [assetSort, setAssetSort] = useState("default");
   const [assetForm, setAssetForm] = useState(assetSeed);
   const [recordForm, setRecordForm] = useState(recordSeed);
+  const [transferForm, setTransferForm] = useState(transferSeed);
   const [editingId, setEditingId] = useState("");
   const [assetOpen, setAssetOpen] = useState(false);
   const [recordOpen, setRecordOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
   const [deviceOpen, setDeviceOpen] = useState(false);
   const [deviceEditingId, setDeviceEditingId] = useState("");
   const [deviceForm, setDeviceForm] = useState(deviceSeed);
@@ -170,6 +186,14 @@ export default function App() {
     () => records.map((r) => ({ ...r, asset: assetMap.get(r.asset_id) })),
     [records, assetMap],
   );
+  const transferRows = useMemo(
+    () =>
+      transferRecords.map((record) => ({
+        ...record,
+        asset: assetMap.get(record.asset_id),
+      })),
+    [transferRecords, assetMap],
+  );
   const filtered = useMemo(
     () =>
       assets
@@ -190,12 +214,19 @@ export default function App() {
 
   async function refresh() {
     try {
-      const [a, r] = await Promise.all([
+      const [a, r, t, me, logs] = await Promise.all([
         api.listAssets(),
         api.listMaintenanceRecords(),
+        api.listTransferRecords(),
+        api.getMe(),
+        api.listOperationLogs(),
       ]);
       setAssets(a);
       setRecords(r);
+      setTransferRecords(t);
+      setProfile(me);
+      setProfileForm({ full_name: me.full_name || "" });
+      setOperationLogs(logs);
     } catch (e) {
       note(e.message);
     }
@@ -219,7 +250,25 @@ export default function App() {
     await supabaseAuth.auth.signOut();
     setAssets([]);
     setRecords([]);
+    setProfile(null);
+    setOperationLogs([]);
     note("已退出登录");
+  }
+
+  async function saveProfileSetup(e) {
+    e.preventDefault();
+    try {
+      setProfileSaving(true);
+      const data = await api.saveProfile(profileForm);
+      setProfile(data);
+      setProfileForm({ full_name: data.full_name || "" });
+      note("用户资料已完成");
+      await refresh();
+    } catch (error) {
+      note(error.message);
+    } finally {
+      setProfileSaving(false);
+    }
   }
 
   function openNewAsset() {
@@ -290,6 +339,15 @@ export default function App() {
     });
     setRecordOpen(true);
   }
+  function openNewTransfer(assetId = "") {
+    const asset = assets.find((item) => item.id === assetId);
+    setTransferForm({
+      ...transferSeed,
+      asset_ids: asset?.id ? [asset.id] : [],
+      from_warehouse: asset?.warehouse || "",
+    });
+    setTransferOpen(true);
+  }
   async function saveRecord(e) {
     e.preventDefault();
     try {
@@ -318,6 +376,32 @@ export default function App() {
       await refresh();
     } catch (e) {
       note(e.message);
+    } finally {
+      setBusy("");
+    }
+  }
+  async function saveTransfer(e) {
+    e.preventDefault();
+    try {
+      if (!transferForm.from_warehouse) {
+        note("请先选择调出仓库");
+        return;
+      }
+      if (!transferForm.asset_ids.length) {
+        note("请至少选择一台需要调拨的设备");
+        return;
+      }
+      if (!transferForm.to_warehouse) {
+        note("请选择调入仓库");
+        return;
+      }
+      setBusy("transfer");
+      const result = await api.createTransferRecord(transferForm);
+      setTransferOpen(false);
+      note(`已完成 ${result.count} 台设备调拨`);
+      await refresh();
+    } catch (error) {
+      note(error.message);
     } finally {
       setBusy("");
     }
@@ -416,14 +500,7 @@ export default function App() {
     return (
       <div className="auth-shell">
         <form className="auth-card auth-card-premium" onSubmit={signIn}>
-          <div className="auth-mark">
-            <span className="material-symbols-outlined">spa</span>
-          </div>
-          <p className="eyebrow">Swiss Asset Console</p>
           <h1 className="auth-title">登录系统</h1>
-          <p className="auth-note">
-            使用你的 Supabase 账号进入固定资产管理系统。
-          </p>
           <label className="auth-field">
             <span>邮箱</span>
             <input
@@ -482,19 +559,32 @@ export default function App() {
             <span>{n.label}</span>
           </button>
         ))}
-        <button
-          className="ui-primary side"
-          type="button"
-          onClick={view === "devices" ? openNewDevice : openNewAsset}
-        >
-          <span className="material-symbols-outlined">add</span>
-          {view === "devices" ? "新增设备" : "新增资产"}
-        </button>
+        {view === "assets" || view === "devices" || view === "transfers" ? (
+          <button
+            className="ui-primary side"
+            type="button"
+            onClick={
+              view === "devices"
+                ? openNewDevice
+                : view === "transfers"
+                  ? () => openNewTransfer()
+                  : openNewAsset
+            }
+          >
+            <span className="material-symbols-outlined">add</span>
+            {view === "devices"
+              ? "新增设备"
+              : view === "transfers"
+                ? "发起调拨"
+                : "新增资产"}
+          </button>
+        ) : null}
       </aside>
       <div className="ui-main">
         {view === "dashboard" && (
           <Dashboard
             session={session}
+            profile={profile}
             dashboard={dashboard}
             onRefresh={refresh}
             onSignOut={signOut}
@@ -503,6 +593,7 @@ export default function App() {
         {view === "assets" && (
           <Assets
             session={session}
+            profile={profile}
             assets={assets}
             rows={filtered}
             dashboard={dashboard}
@@ -522,14 +613,27 @@ export default function App() {
             onEdit={openEditAsset}
             onWater={(a) => mark(a.id, "water")}
             onMaintain={(a) => mark(a.id, "maintain")}
+            onTransfer={(a) => openNewTransfer(a.id)}
             onRepair={(a) => openNewRecord(a.id)}
             onDelete={removeAsset}
+            onSignOut={signOut}
+          />
+        )}
+        {view === "transfers" && (
+          <Transfers
+            session={session}
+            profile={profile}
+            assets={assets}
+            rows={transferRows}
+            warehouses={warehouses}
+            onCreate={openNewTransfer}
             onSignOut={signOut}
           />
         )}
         {view === "devices" && (
           <DeviceManagement
             session={session}
+            profile={profile}
             rows={filteredDevices}
             total={devices.length}
             search={deviceSearch}
@@ -543,6 +647,7 @@ export default function App() {
         {view === "maintenance" && (
           <Maintenance
             session={session}
+            profile={profile}
             rows={recordRows}
             assets={assets}
             busy={busy}
@@ -551,7 +656,23 @@ export default function App() {
             onSignOut={signOut}
           />
         )}
+        {view === "logs" && (
+          <OperationLogs
+            session={session}
+            profile={profile}
+            rows={operationLogs}
+            onSignOut={signOut}
+          />
+        )}
       </div>
+      {session && profile && !profile.full_name && (
+        <ProfileSetupModal
+          value={profileForm.full_name}
+          busy={profileSaving}
+          onChange={(value) => setProfileForm({ full_name: value })}
+          onSubmit={saveProfileSetup}
+        />
+      )}
       {assetOpen && (
         <Modal
           title={editingId ? "编辑资产" : "新增资产"}
@@ -690,17 +811,51 @@ export default function App() {
           </form>
         </Modal>
       )}
+      {transferOpen && (
+        <Modal
+          title="资产调拨"
+          onClose={() => setTransferOpen(false)}
+          closeOnBackdrop={false}
+          className="transfer-modal-card"
+        >
+          <form className="transfer-form" onSubmit={saveTransfer}>
+            <TransferFields
+              state={transferForm}
+              setState={setTransferForm}
+              assets={assets}
+              warehouses={warehouses}
+            />
+            <div className="modal-actions transfer-modal-actions">
+              <button
+                className="ui-ghost"
+                type="button"
+                onClick={() => setTransferOpen(false)}
+              >
+                取消
+              </button>
+              <button
+                className="ui-primary"
+                type="submit"
+                disabled={busy === "transfer"}
+              >
+                {busy === "transfer" ? "提交中..." : "确认调拨"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
       {toast ? <div className="toast is-visible">{toast}</div> : null}
     </div>
   );
 }
 
-function Dashboard({ session, dashboard, onRefresh, onSignOut }) {
+function Dashboard({ session, profile, dashboard, onRefresh, onSignOut }) {
   return (
     <>
       <header className="page-top no-search">
         <ProfileMenu
           session={session}
+          profile={profile}
           role="系统管理员"
           onSignOut={onSignOut}
         />
@@ -788,6 +943,7 @@ function Dashboard({ session, dashboard, onRefresh, onSignOut }) {
 
 function Assets({
   session,
+  profile,
   assets,
   rows,
   dashboard,
@@ -807,6 +963,7 @@ function Assets({
   onEdit,
   onWater,
   onMaintain,
+  onTransfer,
   onRepair,
   onDelete,
   onSignOut,
@@ -816,6 +973,7 @@ function Assets({
       <header className="records-top no-search">
         <ProfileMenu
           session={session}
+          profile={profile}
           role="资产管理员"
           onSignOut={onSignOut}
         />
@@ -1046,6 +1204,9 @@ function Assets({
                       <button onClick={() => onEdit(a)} type="button">
                         编辑
                       </button>
+                      <button onClick={() => onTransfer(a)} type="button">
+                        调拨
+                      </button>
                       <button onClick={() => onRepair(a)} type="button">
                         报修
                       </button>
@@ -1078,6 +1239,7 @@ function Assets({
 
 function DeviceManagement({
   session,
+  profile,
   rows,
   total,
   search,
@@ -1092,6 +1254,7 @@ function DeviceManagement({
       <header className="records-top no-search">
         <ProfileMenu
           session={session}
+          profile={profile}
           role="设备管理员"
           onSignOut={onSignOut}
         />
@@ -1183,99 +1346,161 @@ function DeviceManagement({
   );
 }
 
-function Maintenance({
+function Transfers({
   session,
-  rows,
+  profile,
   assets,
-  busy,
+  rows,
+  warehouses,
   onCreate,
-  onDelete,
   onSignOut,
 }) {
+  const [search, setSearch] = useState("");
+  const [warehouse, setWarehouse] = useState("");
+  const [status, setStatus] = useState("");
+
+  const filteredRows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return rows.filter((row) => {
+      const warehouseMatch =
+        !warehouse ||
+        row.from_warehouse === warehouse ||
+        row.to_warehouse === warehouse;
+      const statusMatch = !status || row.status === status;
+      if (!warehouseMatch || !statusMatch) return false;
+      if (!query) return true;
+      return [
+        row.transfer_no,
+        row.asset_serial_number,
+        row.asset_model,
+        row.asset_brand,
+      ].some((value) =>
+        String(value || "")
+          .toLowerCase()
+          .includes(query),
+      );
+    });
+  }, [rows, search, warehouse, status]);
+
+  const monthCount = filteredRows.filter((row) => {
+    const date = new Date(row.created_at);
+    const now = new Date();
+    return (
+      date.getFullYear() === now.getFullYear() &&
+      date.getMonth() === now.getMonth()
+    );
+  }).length;
+
   return (
     <>
       <header className="records-top no-search">
         <ProfileMenu
           session={session}
-          role="维修管理员"
+          profile={profile}
+          role="调拨管理员"
           onSignOut={onSignOut}
         />
       </header>
       <section className="page-body">
         <div className="records-heading">
           <div>
-            <h1>维修记录</h1>
-            <span>查看并管理设备维修历史。</span>
+            <p>WAREHOUSE TRANSFER FLOW</p>
+            <h1>资产调拨</h1>
+            <span>管理仓库内资产调拨，完成后自动更新资产所在仓库并沉淀调拨记录。</span>
           </div>
           <div className="records-head-actions">
-            <button className="ui-ghost" type="button">
-              导出 PDF
-            </button>
             <button className="ui-primary" onClick={onCreate} type="button">
-              新增记录
+              发起调拨
             </button>
           </div>
         </div>
         <div className="dash-cards">
-          {metric("list_alt", "记录总数", rows.length, "teal")}
-          {metric(
-            "payments",
-            "年度费用",
-            `¥ ${sumMaintenanceCost(rows).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}`,
-            "orange",
-          )}
-          {metric(
-            "warning",
-            "维修中设备",
-            assets.filter((a) => a.status === "维修中").length,
-            "green",
-          )}
+          {metric("swap_horiz", "调拨总数", rows.length, "teal")}
+          {metric("calendar_month", "本月调拨", monthCount, "orange")}
+          {metric("inventory_2", "可调拨资产", assets.length, "blue")}
+        </div>
+        <div className="filters-bar">
+          <div className="filter-primary">
+            <div className="filter-search">
+              <span className="material-symbols-outlined">search</span>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="搜索调拨单号、序列号、设备名"
+              />
+            </div>
+            <span className="filter-stat">
+              当前显示 {filteredRows.length} / {rows.length}
+            </span>
+          </div>
+          <div className="filter-grid transfer-filter-grid">
+            <label className="filter-field">
+              <span>仓库</span>
+              <select
+                value={warehouse}
+                onChange={(e) => setWarehouse(e.target.value)}
+              >
+                <option value="">全部仓库</option>
+                {warehouses.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filter-field">
+              <span>状态</span>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
+                <option value="">全部状态</option>
+                <option value="已完成">已完成</option>
+                <option value="待处理">待处理</option>
+                <option value="已取消">已取消</option>
+              </select>
+            </label>
+          </div>
         </div>
         <div className="table-shell">
           <table className="grid-table">
             <thead>
               <tr>
-                <th>日期</th>
+                <th>调拨单号</th>
                 <th>序列号</th>
-                <th>问题描述</th>
-                <th>供应商</th>
-                <th>费用</th>
-                <th>操作</th>
+                <th>设备名</th>
+                <th>叉车品牌</th>
+                <th>调出仓库</th>
+                <th>调入仓库</th>
+                <th>申请人</th>
+                <th>调拨原因</th>
+                <th>调拨时间</th>
+                <th>状态</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td>{formatDate(r.maintenance_date)}</td>
+              {filteredRows.map((row) => (
+                <tr key={row.id}>
+                  <td className="strong-cell">{row.transfer_no}</td>
+                  <td>{row.asset_serial_number}</td>
+                  <td>{row.asset_model}</td>
+                  <td>{row.asset_brand}</td>
+                  <td>{row.from_warehouse}</td>
+                  <td>{row.to_warehouse}</td>
+                  <td>{row.requested_by_name}</td>
+                  <td>{row.reason}</td>
+                  <td>{formatDateTime(row.created_at)}</td>
                   <td>
-                    <strong>{r.asset?.serial_number || r.asset_id}</strong>
-                  </td>
-                  <td>
-                    <strong>{r.issue_description}</strong>
-                    <span>{r.asset?.model || "未关联资产"}</span>
-                  </td>
-                  <td>{r.provider || "-"}</td>
-                  <td>
-                    {r.cost
-                      ? `¥ ${Number(r.cost).toLocaleString("zh-CN")}`
-                      : "-"}
-                  </td>
-                  <td>
-                    <button
-                      className="danger"
-                      onClick={() => onDelete(r.id)}
-                      type="button"
-                      disabled={busy === `record-${r.id}`}
-                    >
-                      删除
-                    </button>
+                    <span className={`status-tag ${row.status === "已完成" ? "owned" : "unknown"}`}>
+                      {row.status}
+                    </span>
                   </td>
                 </tr>
               ))}
-              {!rows.length && (
+              {!filteredRows.length && (
                 <tr>
-                  <td colSpan="6">
-                    <div className="empty-state">暂无维修记录。</div>
+                  <td colSpan="10">
+                    <div className="empty-state">暂无调拨记录。</div>
                   </td>
                 </tr>
               )}
@@ -1287,10 +1512,268 @@ function Maintenance({
   );
 }
 
-function ProfileMenu({ session, role, onSignOut }) {
+function Maintenance({
+  session,
+  profile,
+  rows,
+  assets,
+  busy,
+  onCreate,
+  onDelete,
+  onSignOut,
+}) {
+  const [search, setSearch] = useState("");
+  const [warehouse, setWarehouse] = useState("");
+  const warehouseOptions = useMemo(
+    () => uniqueOptions(assets.map((asset) => asset.warehouse)),
+    [assets],
+  );
+  const filteredRows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return rows.filter((row) => {
+      const assetWarehouse = row.asset?.warehouse ?? "";
+      const matchWarehouse = !warehouse || assetWarehouse === warehouse;
+      if (!matchWarehouse) return false;
+      if (!query) return true;
+      const serial = (row.asset?.serial_number ?? row.asset_id ?? "").toLowerCase();
+      const model = (row.asset?.model ?? "").toLowerCase();
+      return serial.includes(query) || model.includes(query);
+    });
+  }, [rows, search, warehouse]);
+
+  return (
+    <>
+      <header className="records-top no-search">
+        <ProfileMenu
+          session={session}
+          profile={profile}
+          role="维修管理员"
+          onSignOut={onSignOut}
+        />
+      </header>
+      <section className="page-body">
+        <div className="records-heading">
+          <div>
+            <h1>维修记录</h1>
+            <span>查看并管理设备维修历史。</span>
+          </div>
+        </div>
+        <div className="dash-cards">
+          {metric("list_alt", "记录总数", filteredRows.length, "teal")}
+          {metric(
+            "payments",
+            "年度费用",
+            `$${sumMaintenanceCost(filteredRows).toLocaleString("en-US", { maximumFractionDigits: 2 })}`,
+            "orange",
+          )}
+          {metric(
+            "warning",
+            "维修中设备",
+            assets.filter((a) => a.status === "维修中").length,
+            "green",
+          )}
+        </div>
+        <div className="filters-bar">
+          <div className="filter-primary">
+            <div className="filter-search">
+              <span className="material-symbols-outlined">search</span>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="搜索序列号、设备名"
+              />
+            </div>
+            <div className="filter-stat">当前显示 {filteredRows.length} / {rows.length}</div>
+          </div>
+          <div className="filter-grid maintenance-filter-grid">
+            <label className="filter-field">
+              <span>仓库</span>
+              <select
+                value={warehouse}
+                onChange={(e) => setWarehouse(e.target.value)}
+              >
+                <option value="">全部仓库</option>
+                {warehouseOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+        <div className="table-shell">
+          <table className="grid-table">
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>序列号</th>
+                <th>设备名</th>
+                <th>问题描述</th>
+                <th>仓库</th>
+                <th>供应商</th>
+                <th>费用</th>
+                <th>照片</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRows.map((r) => (
+                <tr key={r.id}>
+                  <td>{formatDate(r.maintenance_date)}</td>
+                  <td>
+                    <strong>{r.asset?.serial_number || r.asset_id}</strong>
+                  </td>
+                  <td>
+                    {r.asset?.model || "未关联资产"}
+                  </td>
+                  <td>
+                    <strong>{r.issue_description}</strong>
+                  </td>
+                  <td>{r.asset?.warehouse || "-"}</td>
+                  <td>{r.provider || "-"}</td>
+                  <td>
+                    {r.cost
+                      ? `$${Number(r.cost).toLocaleString("en-US")}`
+                      : "-"}
+                  </td>
+                  <td>
+                    {r.photo_url ? (
+                      <a
+                        className="table-link"
+                        href={r.photo_url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        查看照片
+                      </a>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+                  <td>
+                    <button
+                      className="ui-ghost danger-line maintenance-delete"
+                      onClick={() => onDelete(r.id)}
+                      type="button"
+                      disabled={busy === `record-${r.id}`}
+                    >
+                      删除
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!filteredRows.length && (
+                <tr>
+                  <td colSpan="9">
+                    <div className="empty-state">暂无符合条件的维修记录。</div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function OperationLogs({ session, profile, rows, onSignOut }) {
+  return (
+    <>
+      <header className="records-top no-search">
+        <ProfileMenu
+          session={session}
+          profile={profile}
+          role="系统日志"
+          onSignOut={onSignOut}
+        />
+      </header>
+      <section className="page-body">
+        <div className="records-heading">
+          <div>
+            <h1>操作日志</h1>
+            <span>记录资产与维修相关操作，显示首次填写的用户全名。</span>
+          </div>
+        </div>
+        <div className="table-shell">
+          <table className="grid-table">
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>用户</th>
+                <th>操作</th>
+                <th>类型</th>
+                <th>对象</th>
+                <th>详情</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <td>{formatDateTime(row.created_at)}</td>
+                  <td>
+                    <strong>{row.actor_name}</strong>
+                    <span>{row.actor_email || "-"}</span>
+                  </td>
+                  <td>{row.action}</td>
+                  <td>{row.target_type}</td>
+                  <td>{row.target_label || "-"}</td>
+                  <td>{row.details || "-"}</td>
+                </tr>
+              ))}
+              {!rows.length && (
+                <tr>
+                  <td colSpan="6">
+                    <div className="empty-state">暂无操作日志。</div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function ProfileSetupModal({ value, busy, onChange, onSubmit }) {
+  return (
+    <div className="modal-backdrop profile-setup-backdrop">
+      <div className="modal-card profile-setup-card">
+        <div className="modal-head profile-setup-head">
+          <h3>完善用户资料</h3>
+        </div>
+        <p className="profile-setup-copy">
+          首次登录请填写用户全名
+        </p>
+        <form className="form-grid" onSubmit={onSubmit}>
+          <label className="full-width">
+            <span>用户全名</span>
+            <input
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              maxLength={60}
+              required
+              autoFocus
+              placeholder="请输入你的全名"
+            />
+          </label>
+          <div className="modal-actions full-width">
+            <button className="ui-primary" type="submit" disabled={busy}>
+              {busy ? "保存中..." : "进入系统"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ProfileMenu({ session, profile, role, onSignOut }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
-  const name = session.user.email?.split("@")[0] || "用户";
+  const name = profile?.full_name || session.user.email?.split("@")[0] || "用户";
 
   useEffect(() => {
     function handlePointerDown(e) {
@@ -1414,6 +1897,219 @@ function assetFields(state, setState) {
     </>
   );
 }
+
+function TransferFields({ state, setState, assets, warehouses }) {
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+
+  const candidateAssets = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return assets
+      .filter((asset) =>
+        state.from_warehouse ? asset.warehouse === state.from_warehouse : true,
+      )
+      .filter((asset) => (status ? asset.status === status : true))
+      .filter((asset) => {
+        if (!query) return true;
+        return [asset.serial_number, asset.model, asset.brand, asset.supplier]
+          .some((value) =>
+            String(value || "")
+              .toLowerCase()
+              .includes(query),
+          );
+      })
+      .sort(compareDefaultOrder);
+  }, [assets, search, state.from_warehouse, status]);
+
+  const selectedAssets = useMemo(
+    () =>
+      assets.filter((asset) => state.asset_ids.includes(asset.id)),
+    [assets, state.asset_ids],
+  );
+
+  const targetWarehouses = warehouses.filter(
+    (item) => item && item !== state.from_warehouse,
+  );
+
+  function toggleAsset(assetId) {
+    setState((prev) => ({
+      ...prev,
+      asset_ids: prev.asset_ids.includes(assetId)
+        ? prev.asset_ids.filter((id) => id !== assetId)
+        : [...prev.asset_ids, assetId],
+    }));
+  }
+
+  return (
+    <div className="transfer-builder full-width">
+      <div className="transfer-pane">
+        <div className="transfer-pane-head">
+          <div>
+            <h4>选择设备</h4>
+            <span>先锁定调出仓库，再批量选择需要调拨的设备。</span>
+          </div>
+          <span className="transfer-count-pill">已选 {selectedAssets.length} 台</span>
+        </div>
+        <div className="transfer-toolbar">
+          <label className="filter-field">
+            <span>调出仓库</span>
+            <select
+              value={state.from_warehouse}
+              onChange={(e) =>
+                setState((prev) => ({
+                  ...prev,
+                  from_warehouse: e.target.value,
+                  asset_ids: [],
+                  to_warehouse:
+                    e.target.value === prev.to_warehouse ? "" : prev.to_warehouse,
+                }))
+              }
+              required
+            >
+              <option value="">请选择仓库</option>
+              {warehouses.map((warehouse) => (
+                <option key={warehouse} value={warehouse}>
+                  {warehouse}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-field transfer-status-filter">
+            <span>状态</span>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              disabled={!state.from_warehouse}
+            >
+              <option value="">全部状态</option>
+              {statuses.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="filter-search transfer-search">
+            <span className="material-symbols-outlined">search</span>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="搜索序列号、设备名、品牌、供应商"
+              disabled={!state.from_warehouse}
+            />
+          </div>
+        </div>
+        <div className="transfer-device-list">
+          {!state.from_warehouse ? (
+            <div className="empty-state transfer-empty">
+              先选择调出仓库，再从左侧设备池里勾选需要调拨的设备。
+            </div>
+          ) : candidateAssets.length ? (
+            candidateAssets.map((asset) => {
+              const checked = state.asset_ids.includes(asset.id);
+              return (
+                <button
+                  key={asset.id}
+                  className={`transfer-device-card${checked ? " is-selected" : ""}`}
+                  type="button"
+                  onClick={() => toggleAsset(asset.id)}
+                >
+                  <span className={`transfer-device-check${checked ? " is-selected" : ""}`}>
+                    {checked ? "✓" : ""}
+                  </span>
+                  <div className="transfer-device-copy">
+                    <div className="transfer-device-mainline">
+                      <strong>{asset.model}</strong>
+                      <span className={`status-tag ${statusClassName(asset.status)}`}>
+                        {asset.status}
+                      </span>
+                    </div>
+                    <span>{asset.serial_number}</span>
+                    <small>
+                      {asset.brand} · {asset.supplier || "无供应商"} · {asset.warehouse}
+                    </small>
+                  </div>
+                </button>
+              );
+            })
+          ) : (
+            <div className="empty-state transfer-empty">
+              这个仓库下没有符合筛选条件的设备。
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="transfer-pane transfer-summary-pane">
+        <div className="transfer-pane-head">
+          <div>
+            <h4>调拨详情</h4>
+            <span>确认目标仓库、调拨原因和补充说明。</span>
+          </div>
+        </div>
+        <div className="transfer-selected-list">
+          {selectedAssets.length ? (
+            selectedAssets.map((asset) => (
+              <div className="transfer-selected-card" key={asset.id}>
+                <div>
+                  <strong>{asset.model}</strong>
+                  <span>{asset.serial_number}</span>
+                </div>
+                <button type="button" onClick={() => toggleAsset(asset.id)}>
+                  移除
+                </button>
+              </div>
+            ))
+          ) : (
+            <div className="empty-state transfer-empty">
+              还没有选择需要调拨的设备。
+            </div>
+          )}
+        </div>
+        <label className="full-width">
+          <span>调入仓库</span>
+          <select
+            value={state.to_warehouse}
+            onChange={(e) =>
+              setState((prev) => ({ ...prev, to_warehouse: e.target.value }))
+            }
+            required
+            disabled={!state.from_warehouse}
+          >
+            <option value="">请选择目标仓库</option>
+            {targetWarehouses.map((warehouse) => (
+              <option key={warehouse} value={warehouse}>
+                {warehouse}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="full-width">
+          <span>调拨原因</span>
+          <input
+            value={state.reason}
+            onChange={(e) =>
+              setState((prev) => ({ ...prev, reason: e.target.value }))
+            }
+            required
+            placeholder="例如：波次高峰支援、车型调整、临时借调"
+          />
+        </label>
+        <label className="full-width">
+          <span>备注说明</span>
+          <textarea
+            rows="5"
+            value={state.note}
+            onChange={(e) =>
+              setState((prev) => ({ ...prev, note: e.target.value }))
+            }
+            placeholder="补充调拨背景、接收人、预计使用时间等"
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
 function field(label, control) {
   return (
     <label>
@@ -1422,10 +2118,22 @@ function field(label, control) {
     </label>
   );
 }
-function Modal({ title, children, onClose }) {
+function Modal({
+  title,
+  children,
+  onClose,
+  closeOnBackdrop = true,
+  className = "",
+}) {
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="modal-backdrop"
+      onClick={closeOnBackdrop ? onClose : undefined}
+    >
+      <div
+        className={`modal-card${className ? ` ${className}` : ""}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-head">
           <h3>{title}</h3>
           <button className="ui-ghost icon" onClick={onClose} type="button">
@@ -1619,6 +2327,18 @@ function formatDate(v) {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
+  }).format(d);
+}
+function formatDateTime(v) {
+  if (!v) return "-";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return v;
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
   }).format(d);
 }
 function formatPurchaseOrdered(value) {
