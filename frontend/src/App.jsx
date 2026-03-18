@@ -1564,7 +1564,11 @@ function Maintenance({
           {metric(
             "payments",
             "年度费用",
-            `$${sumMaintenanceCost(filteredRows).toLocaleString("en-US", { maximumFractionDigits: 2 })}`,
+            Intl.NumberFormat("zh-CN", {
+              style: "currency",
+              currency: "CNY",
+              maximumFractionDigits: 2,
+            }).format(sumMaintenanceCost(filteredRows)),
             "orange",
           )}
           {metric(
