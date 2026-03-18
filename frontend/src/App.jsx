@@ -31,6 +31,8 @@ const assetSeed = {
   maintenance_interval_days: 90,
   notes: "",
 };
+
+const assetStatuses = ["租赁", "自购", "备用", "维修中", "停用", "已退租", "报废"];
 const recordSeed = {
   asset_id: "",
   maintenance_date: "",
@@ -1371,7 +1373,16 @@ function assetFields(state, setState) {
       {field("序列号", <input {...bind("serial_number")} required />)}
       {field("叉车品牌", <input {...bind("brand")} required />)}
       {field("供应商", <input {...bind("supplier")} />)}
-      {field("状态", <input {...bind("status")} />)}
+      {field(
+        "状态",
+        <select {...bind("status")}>
+          {assetStatuses.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>,
+      )}
       {field(
         "月租",
         <input type="number" step="0.01" {...bind("monthly_rent")} />,
