@@ -1555,12 +1555,16 @@ function resolveAssetReference(value, assets) {
   );
   if (exact) return exact.id;
 
-  const partial = assets.find(
+  const partialMatches = assets.filter(
     (asset) =>
       String(asset.model || "").toLowerCase().includes(query) ||
       String(asset.serial_number || "").toLowerCase().includes(query),
   );
-  return partial?.id || "";
+  if (partialMatches.length === 1) {
+    return partialMatches[0].id || "";
+  }
+  // 模糊匹配结果为 0 或多条时，不进行静默关联，交由调用方/界面处理
+  return "";
 }
 function summarize(assets, records) {
   const alerts = assets
