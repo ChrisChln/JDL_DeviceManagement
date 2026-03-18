@@ -31,6 +31,9 @@ alter table if exists public.assets
   add column if not exists current_status text,
   add column if not exists issue_feedback text;
 
+alter table if exists public.assets
+  drop constraint if exists assets_status_check;
+
 update public.assets
 set status = case status
   when 'lease' then '租赁'
@@ -41,9 +44,6 @@ set status = case status
   else status
 end
 where status in ('lease', 'rent', 'owned', 'repair', 'idle');
-
-alter table if exists public.assets
-  drop constraint if exists assets_status_check;
 
 alter table if exists public.assets
   add constraint assets_status_check
