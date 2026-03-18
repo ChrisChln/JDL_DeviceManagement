@@ -250,6 +250,7 @@ export default function App() {
     await supabaseAuth.auth.signOut();
     setAssets([]);
     setRecords([]);
+    setTransferRecords([]);
     setProfile(null);
     setOperationLogs([]);
     note("已退出登录");
