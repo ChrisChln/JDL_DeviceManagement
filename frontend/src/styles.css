@@ -1147,7 +1147,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .filter-grid { grid-template-columns: 1fr; }
   .transfer-filter-grid { grid-template-columns: 1fr; }
   .transfer-modal-card {
-    width: min(100vw - 16px, 100%);
+    width: min(calc(100vw - 16px), 100%);
     padding: 20px;
   }
   .transfer-modal-actions {
