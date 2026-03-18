@@ -16,17 +16,23 @@ const assetSeed = {
   serial_number: "",
   brand: "",
   supplier: "",
-  status: "lease",
+  status: "租赁",
   monthly_rent: "",
+  is_purchase_ordered: "",
   lease_start_date: "",
   lease_end_date: "",
   lease_resolution: "",
+  operation_requirement: "",
+  current_status: "",
+  issue_feedback: "",
   last_watered_at: "",
   water_interval_days: 14,
   last_maintained_at: "",
   maintenance_interval_days: 90,
   notes: "",
 };
+
+const assetStatuses = ["租赁", "自购", "备用", "维修中", "停用", "已退租", "报废"];
 const recordSeed = {
   asset_id: "",
   maintenance_date: "",
@@ -41,7 +47,46 @@ const nav = [
   { id: "devices", label: "设备管理", icon: "devices" },
   { id: "maintenance", label: "维修记录", icon: "build" },
 ];
-const statuses = ["lease", "rent", "owned", "repair", "idle"];
+const statuses = ["租赁", "月租", "自有", "维修中", "闲置"];
+const exportColumns = [
+  { header: "仓库", value: (asset) => asset.warehouse ?? "" },
+  { header: "车型", value: (asset) => asset.model ?? "" },
+  { header: "序列号", value: (asset) => asset.serial_number ?? "" },
+  { header: "供应商", value: (asset) => asset.supplier ?? "" },
+  { header: "叉车品牌", value: (asset) => asset.brand ?? "" },
+  { header: "状态", value: (asset) => asset.status ?? "" },
+  { header: "月租", value: (asset) => asset.monthly_rent ?? "" },
+  {
+    header: "是否采购下单",
+    value: (asset) =>
+      formatPurchaseOrdered(
+        asset.is_purchase_ordered ??
+          asset.purchase_order_status ??
+          asset.purchase_ordered ??
+          "",
+      ),
+  },
+  { header: "起租日期", value: (asset) => asset.lease_start_date ?? "" },
+  { header: "到期日期", value: (asset) => asset.lease_end_date ?? "" },
+  { header: "后期处理方式", value: (asset) => asset.lease_resolution ?? "" },
+  {
+    header: "运营需求",
+    value: (asset) =>
+      asset.operation_requirement ?? asset.operational_requirement ?? "",
+  },
+  {
+    header: "目前状态",
+    value: (asset) => asset.current_status ?? "",
+  },
+  {
+    header: "问题反馈",
+    value: (asset) => asset.issue_feedback ?? "",
+  },
+  { header: "上次加水日期", value: (asset) => asset.last_watered_at ?? "" },
+  { header: "加水周期", value: (asset) => asset.water_interval_days ?? "" },
+  { header: "上次保养日期", value: (asset) => asset.last_maintained_at ?? "" },
+  { header: "保养周期", value: (asset) => asset.maintenance_interval_days ?? "" },
+];
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -54,10 +99,13 @@ export default function App() {
   const [records, setRecords] = useState([]);
   const [filters, setFilters] = useState({
     search: "",
-    warehouse: "all",
-    status: "all",
-    due: "all",
+    warehouse: "",
+    model: "",
+    supplier: "",
+    brand: "",
+    status: "",
   });
+  const [assetSort, setAssetSort] = useState("default");
   const [assetForm, setAssetForm] = useState(assetSeed);
   const [recordForm, setRecordForm] = useState(recordSeed);
   const [editingId, setEditingId] = useState("");
@@ -105,9 +153,15 @@ export default function App() {
     [assets, records],
   );
   const warehouses = useMemo(
-    () => ["all", ...new Set(assets.map((a) => a.warehouse).filter(Boolean))],
+    () => uniqueOptions(assets.map((a) => a.warehouse)),
     [assets],
   );
+  const models = useMemo(() => uniqueOptions(assets.map((a) => a.model)), [assets]);
+  const suppliers = useMemo(
+    () => uniqueOptions(assets.map((a) => a.supplier)),
+    [assets],
+  );
+  const brands = useMemo(() => uniqueOptions(assets.map((a) => a.brand)), [assets]);
   const assetMap = useMemo(
     () => new Map(assets.map((a) => [a.id, a])),
     [assets],
@@ -117,8 +171,11 @@ export default function App() {
     [records, assetMap],
   );
   const filtered = useMemo(
-    () => assets.filter((a) => filterAsset(a, filters)),
-    [assets, filters],
+    () =>
+      assets
+        .filter((a) => filterAsset(a, filters))
+        .sort((a, b) => compareAssets(a, b, assetSort)),
+    [assets, filters, assetSort],
   );
   const filteredDevices = useMemo(
     () => filterDevices(devices, deviceSearch),
@@ -172,7 +229,16 @@ export default function App() {
   }
   function openEditAsset(a) {
     setEditingId(a.id);
-    setAssetForm({ ...assetSeed, ...a });
+    setAssetForm({
+      ...assetSeed,
+      ...a,
+      is_purchase_ordered:
+        a.is_purchase_ordered === null || a.is_purchase_ordered === undefined
+          ? ""
+          : a.is_purchase_ordered
+            ? "是"
+            : "否",
+    });
     setAssetOpen(true);
   }
   async function saveAsset(e) {
@@ -217,14 +283,23 @@ export default function App() {
     }
   }
   function openNewRecord(assetId = "") {
-    setRecordForm({ ...recordSeed, asset_id: assetId });
+    const asset = assets.find((item) => item.id === assetId);
+    setRecordForm({
+      ...recordSeed,
+      asset_id: asset?.serial_number || assetId,
+    });
     setRecordOpen(true);
   }
   async function saveRecord(e) {
     e.preventDefault();
     try {
       setBusy("record");
-      await api.createMaintenanceRecord(recordForm);
+      const assetId = resolveAssetReference(recordForm.asset_id, assets);
+      if (!assetId) {
+        note("请输入可匹配的资产序列号、车型或 ID");
+        return;
+      }
+      await api.createMaintenanceRecord({ ...recordForm, asset_id: assetId });
       setRecordOpen(false);
       note("维修记录已保存");
       await refresh();
@@ -263,38 +338,30 @@ export default function App() {
     }
   }
   function onExport() {
-    const rows = filtered.map((a) => [
-      a.warehouse,
-      a.model,
-      a.serial_number,
-      a.brand,
-      a.status,
-      a.lease_end_date || "",
-      a.last_watered_at || "",
-      a.last_maintained_at || "",
-    ]);
-    const csv = [
-      [
-        "仓库",
-        "车型",
-        "序列号",
-        "品牌",
-        "状态",
-        "到期日期",
-        "上次加水",
-        "上次保养",
-      ],
-      ...rows,
-    ]
-      .map((r) => r.map(csvCell).join(","))
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `assets-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const XLSX = window.XLSX;
+    if (!XLSX) {
+      note("导出失败：未加载 Excel 导出组件");
+      return;
+    }
+
+    const sheetRows = filtered.map((asset) =>
+      Object.fromEntries(
+        exportColumns.map((column) => [column.header, column.value(asset)]),
+      ),
+    );
+    const worksheet = XLSX.utils.json_to_sheet(sheetRows, {
+      header: exportColumns.map((column) => column.header),
+    });
+    worksheet["!cols"] = exportColumns.map((column) => ({
+      wch: Math.max(column.header.length + 4, 12),
+    }));
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "资产台账");
+    XLSX.writeFile(
+      workbook,
+      `assets-${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
   }
 
   function openNewDevice() {
@@ -397,11 +464,10 @@ export default function App() {
       <aside className="ui-sidebar">
         <div className="ui-brand">
           <div className="ui-brand-icon">
-            <span className="material-symbols-outlined">spa</span>
+            <img alt="JDL Logo" src="/jdl-logo.png" />
           </div>
           <div>
-            <h1>SWISS SPA MGMT</h1>
-            <p>PREMIUM ASSET LEDGER</p>
+            <h1>JDL资产管理</h1>
           </div>
         </div>
         <p className="ui-label">主控制台</p>
@@ -442,7 +508,12 @@ export default function App() {
             dashboard={dashboard}
             filters={filters}
             setFilters={setFilters}
+            assetSort={assetSort}
+            setAssetSort={setAssetSort}
             warehouses={warehouses}
+            models={models}
+            suppliers={suppliers}
+            brands={brands}
             busy={busy}
             fileRef={fileRef}
             onImport={onImport}
@@ -534,20 +605,14 @@ export default function App() {
           <form className="form-grid" onSubmit={saveRecord}>
             <label className="full-width">
               <span>资产</span>
-              <select
+              <input
                 value={recordForm.asset_id}
                 onChange={(e) =>
                   setRecordForm((s) => ({ ...s, asset_id: e.target.value }))
                 }
                 required
-              >
-                <option value="">请选择资产</option>
-                {assets.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.serial_number} · {a.model}
-                  </option>
-                ))}
-              </select>
+                placeholder="输入资产序列号、车型或 ID"
+              />
             </label>
             <label>
               <span>日期</span>
@@ -728,7 +793,12 @@ function Assets({
   dashboard,
   filters,
   setFilters,
+  assetSort,
+  setAssetSort,
   warehouses,
+  models,
+  suppliers,
+  brands,
   busy,
   fileRef,
   onImport,
@@ -793,63 +863,148 @@ function Assets({
           )}
         </div>
         <div className="filters-bar">
-          <div className="filter-search">
-            <span className="material-symbols-outlined">search</span>
-            <input
-              value={filters.search}
-              onChange={(e) =>
-                setFilters((s) => ({ ...s, search: e.target.value }))
-              }
-              placeholder="序列号、品牌、设备..."
-            />
+          <div className="filter-primary">
+            <div className="filter-search">
+              <span className="material-symbols-outlined">search</span>
+              <input
+                value={filters.search}
+                onChange={(e) =>
+                  setFilters((s) => ({ ...s, search: e.target.value }))
+                }
+                placeholder="搜索序列号、品牌、车型"
+              />
+            </div>
+            <span className="filter-stat">
+              当前显示 {rows.length} / {assets.length}
+            </span>
           </div>
-          <select
-            value={filters.warehouse}
-            onChange={(e) =>
-              setFilters((s) => ({ ...s, warehouse: e.target.value }))
-            }
-          >
-            {warehouses.map((w) => (
-              <option key={w} value={w}>
-                {w === "all" ? "全部仓库" : w}
-              </option>
-            ))}
-          </select>
-          <select
-            value={filters.status}
-            onChange={(e) =>
-              setFilters((s) => ({ ...s, status: e.target.value }))
-            }
-          >
-            <option value="all">全部状态</option>
-            {statuses.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          <select
-            value={filters.due}
-            onChange={(e) => setFilters((s) => ({ ...s, due: e.target.value }))}
-          >
-            <option value="all">全部提醒</option>
-            <option value="lease90">到期提醒</option>
-            <option value="water">加水提醒</option>
-            <option value="maintenance">保养提醒</option>
-            <option value="overdue">仅逾期</option>
-          </select>
-          <span>
-            当前显示 {rows.length} / {assets.length}
-          </span>
+          <div className="filter-grid">
+            <label className="filter-field">
+              <span>仓库</span>
+              <select
+                value={filters.warehouse}
+                onChange={(e) =>
+                  setFilters((s) => ({ ...s, warehouse: e.target.value }))
+                }
+              >
+                <option value="">全部仓库</option>
+                {warehouses.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filter-field">
+              <span>车型</span>
+              <select
+                value={filters.model}
+                onChange={(e) =>
+                  setFilters((s) => ({ ...s, model: e.target.value }))
+                }
+              >
+                <option value="">全部车型</option>
+                {models.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filter-field">
+              <span>供应商</span>
+              <select
+                value={filters.supplier}
+                onChange={(e) =>
+                  setFilters((s) => ({ ...s, supplier: e.target.value }))
+                }
+              >
+                <option value="">全部供应商</option>
+                {suppliers.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filter-field">
+              <span>叉车品牌</span>
+              <select
+                value={filters.brand}
+                onChange={(e) =>
+                  setFilters((s) => ({ ...s, brand: e.target.value }))
+                }
+              >
+                <option value="">全部品牌</option>
+                {brands.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filter-field">
+              <span>状态</span>
+              <select
+                value={filters.status}
+                onChange={(e) =>
+                  setFilters((s) => ({ ...s, status: e.target.value }))
+                }
+              >
+                <option value="">全部状态</option>
+                {statuses.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
-        <div className="table-shell">
-          <table className="grid-table">
+        <div className="table-shell asset-list-shell">
+          <table className="grid-table asset-grid-table">
             <thead>
               <tr>
-                <th>资产标识</th>
-                <th>规格信息</th>
-                <th>所在仓库</th>
-                <th>周期提醒</th>
+                <th>
+                  <button
+                    className={`asset-head-button${assetSort === "default" ? " active" : ""}`}
+                    onClick={() => setAssetSort("default")}
+                    type="button"
+                  >
+                    仓库
+                  </button>
+                </th>
+                <th>序列号</th>
+                <th>车型</th>
+                <th>供应商</th>
+                <th>叉车品牌</th>
+                <th>
+                  <button
+                    className={`asset-head-button${assetSort === "lease" ? " active" : ""}`}
+                    onClick={() => setAssetSort("lease")}
+                    type="button"
+                  >
+                    到期提醒
+                  </button>
+                </th>
+                <th>
+                  <button
+                    className={`asset-head-button${assetSort === "water" ? " active" : ""}`}
+                    onClick={() => setAssetSort("water")}
+                    type="button"
+                  >
+                    加水提醒
+                  </button>
+                </th>
+                <th>
+                  <button
+                    className={`asset-head-button${assetSort === "maintenance" ? " active" : ""}`}
+                    onClick={() => setAssetSort("maintenance")}
+                    type="button"
+                  >
+                    保养提醒
+                  </button>
+                </th>
                 <th>状态</th>
                 <th>操作</th>
               </tr>
@@ -857,46 +1012,39 @@ function Assets({
             <tbody>
               {rows.map((a) => (
                 <tr key={a.id}>
-                  <td>
-                    <strong>{a.serial_number}</strong>
-                    <span>{a.brand}</span>
-                  </td>
-                  <td>
-                    <strong>{a.model}</strong>
-                    <span>{a.supplier || "无供应商"}</span>
-                  </td>
                   <td>{a.warehouse}</td>
+                  <td className="strong-cell">{a.serial_number}</td>
+                  <td>{a.model}</td>
+                  <td>{a.supplier || "无供应商"}</td>
+                  <td>{a.brand}</td>
+                  <td>{chip("到期", a.reminders.lease, a.lease_end_date)}</td>
                   <td>
-                    <div className="cycle-stack">
-                      {chip(a.reminders.lease, a.lease_end_date)}
-                      {chip(a.reminders.water, a.reminders.water.nextDate)}
-                      {chip(
-                        a.reminders.maintenance,
-                        a.reminders.maintenance.nextDate,
-                      )}
-                    </div>
+                    {chip(
+                      "加水",
+                      a.reminders.water,
+                      a.reminders.water.nextDate,
+                      () => onWater(a),
+                      busy === `water-${a.id}`,
+                    )}
                   </td>
                   <td>
-                    <span className={`status-tag ${a.status}`}>{a.status}</span>
+                    {chip(
+                      "保养",
+                      a.reminders.maintenance,
+                      a.reminders.maintenance.nextDate,
+                      () => onMaintain(a),
+                      busy === `maintain-${a.id}`,
+                    )}
                   </td>
                   <td>
-                    <div className="action-row">
+                    <span className={`status-tag ${statusClassName(a.status)}`}>
+                      {a.status}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="asset-actions">
                       <button onClick={() => onEdit(a)} type="button">
                         编辑
-                      </button>
-                      <button
-                        onClick={() => onWater(a)}
-                        type="button"
-                        disabled={busy === `water-${a.id}`}
-                      >
-                        已加水
-                      </button>
-                      <button
-                        onClick={() => onMaintain(a)}
-                        type="button"
-                        disabled={busy === `maintain-${a.id}`}
-                      >
-                        已保养
                       </button>
                       <button onClick={() => onRepair(a)} type="button">
                         报修
@@ -915,7 +1063,7 @@ function Assets({
               ))}
               {!rows.length && (
                 <tr>
-                  <td colSpan="6">
+                  <td colSpan="10">
                     <div className="empty-state">没有找到资产。</div>
                   </td>
                 </tr>
@@ -1079,7 +1227,7 @@ function Maintenance({
           {metric(
             "warning",
             "维修中设备",
-            assets.filter((a) => a.status === "repair").length,
+            assets.filter((a) => a.status === "维修中").length,
             "green",
           )}
         </div>
@@ -1223,12 +1371,12 @@ function assetFields(state, setState) {
       {field("仓库", <input {...bind("warehouse")} required />)}
       {field("车型", <input {...bind("model")} required />)}
       {field("序列号", <input {...bind("serial_number")} required />)}
-      {field("品牌", <input {...bind("brand")} required />)}
+      {field("叉车品牌", <input {...bind("brand")} required />)}
       {field("供应商", <input {...bind("supplier")} />)}
       {field(
         "状态",
         <select {...bind("status")}>
-          {statuses.map((s) => (
+          {assetStatuses.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
@@ -1239,9 +1387,16 @@ function assetFields(state, setState) {
         "月租",
         <input type="number" step="0.01" {...bind("monthly_rent")} />,
       )}
+      {field("是否采购下单", <input {...bind("is_purchase_ordered")} />)}
       {field("起租日期", <input type="date" {...bind("lease_start_date")} />)}
       {field("到期日期", <input type="date" {...bind("lease_end_date")} />)}
-      {field("到期处理方式", <input {...bind("lease_resolution")} />)}
+      {field("后期处理方式", <input {...bind("lease_resolution")} />)}
+      {field("运营需求", <input {...bind("operation_requirement")} />)}
+      {field("目前状态", <input {...bind("current_status")} />)}
+      <label className="full-width">
+        <span>问题反馈</span>
+        <textarea rows="3" {...bind("issue_feedback")} />
+      </label>
       {field("上次加水", <input type="date" {...bind("last_watered_at")} />)}
       {field(
         "加水周期",
@@ -1295,35 +1450,121 @@ function metric(icon, label, value, tone) {
     </div>
   );
 }
-function chip(reminder, date) {
+function chip(label, reminder, date, onClick, disabled = false) {
+  const detail = reminder.label || "未设置";
+  const className = `cycle-chip${onClick ? " is-action" : ""}`;
+  if (onClick) {
+    return (
+      <button
+        className={className}
+        disabled={disabled}
+        onClick={onClick}
+        type="button"
+      >
+        <span className="cycle-chip-label">{label}</span>
+        <span className={`badge ${reminder.level}`}>{detail}</span>
+      </button>
+    );
+  }
   return (
-    <div className="cycle-chip">
-      <span className={`badge ${reminder.level}`}>{reminder.label}</span>
-      <small>{date ? formatDate(date) : "-"}</small>
+    <div className={className}>
+      <span className="cycle-chip-label">{label}</span>
+      <span className={`badge ${reminder.level}`}>{detail}</span>
     </div>
+  );
+}
+function metaTag(label, value) {
+  return (
+    <span className="meta-tag" key={`${label}-${value}`}>
+      <b>{label}</b>
+      {value}
+    </span>
   );
 }
 function filterAsset(a, f) {
   const q = f.search.trim().toLowerCase();
+  const warehouseQuery = f.warehouse.trim();
+  const modelQuery = f.model.trim();
+  const supplierQuery = f.supplier.trim();
+  const brandQuery = f.brand.trim();
+  const statusQuery = f.status.trim();
   const s =
     !q ||
-    [a.serial_number, a.brand, a.model, a.warehouse].some((v) =>
+    [a.serial_number, a.brand, a.model, a.warehouse, a.supplier].some((v) =>
       String(v || "")
         .toLowerCase()
         .includes(q),
     );
-  const w = f.warehouse === "all" || a.warehouse === f.warehouse;
-  const st = f.status === "all" || a.status === f.status;
-  const d =
-    f.due === "all" ||
-    (f.due === "lease90" && a.reminders?.lease?.show) ||
-    (f.due === "water" && a.reminders?.water?.show) ||
-    (f.due === "maintenance" && a.reminders?.maintenance?.show) ||
-    (f.due === "overdue" &&
-      [a.reminders?.lease, a.reminders?.water, a.reminders?.maintenance].some(
-        (x) => (x?.daysUntil ?? 1) < 0,
-      ));
-  return s && w && st && d;
+  const w = !warehouseQuery || String(a.warehouse || "") === warehouseQuery;
+  const m = !modelQuery || String(a.model || "") === modelQuery;
+  const sp = !supplierQuery || String(a.supplier || "") === supplierQuery;
+  const b = !brandQuery || String(a.brand || "") === brandQuery;
+  const st = !statusQuery || String(a.status || "") === statusQuery;
+  return s && w && m && sp && b && st;
+}
+function compareAssets(a, b, sortMode) {
+  if (sortMode === "lease") {
+    return compareReminderDates(a.lease_end_date, b.lease_end_date) || compareDefaultOrder(a, b);
+  }
+  if (sortMode === "water") {
+    return (
+      compareReminderDates(a.reminders?.water?.nextDate, b.reminders?.water?.nextDate) ||
+      compareDefaultOrder(a, b)
+    );
+  }
+  if (sortMode === "maintenance") {
+    return (
+      compareReminderDates(
+        a.reminders?.maintenance?.nextDate,
+        b.reminders?.maintenance?.nextDate,
+      ) || compareDefaultOrder(a, b)
+    );
+  }
+  return compareDefaultOrder(a, b);
+}
+function compareDefaultOrder(a, b) {
+  return (
+    compareText(a.warehouse, b.warehouse) ||
+    compareText(a.model, b.model) ||
+    compareText(a.supplier, b.supplier) ||
+    compareText(a.serial_number, b.serial_number)
+  );
+}
+function compareText(a, b) {
+  return String(a || "").localeCompare(String(b || ""), "zh-CN");
+}
+function compareReminderDates(a, b) {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  return new Date(a).getTime() - new Date(b).getTime();
+}
+function uniqueOptions(values) {
+  return [...new Set(values.filter(Boolean).map((value) => String(value).trim()))].sort(
+    (a, b) => a.localeCompare(b, "zh-CN"),
+  );
+}
+function resolveAssetReference(value, assets) {
+  const query = String(value || "").trim().toLowerCase();
+  if (!query) return "";
+
+  const exact = assets.find(
+    (asset) =>
+      String(asset.id || "").toLowerCase() === query ||
+      String(asset.serial_number || "").toLowerCase() === query,
+  );
+  if (exact) return exact.id;
+
+  const partialMatches = assets.filter(
+    (asset) =>
+      String(asset.model || "").toLowerCase().includes(query) ||
+      String(asset.serial_number || "").toLowerCase().includes(query),
+  );
+  if (partialMatches.length === 1) {
+    return partialMatches[0].id || "";
+  }
+  // 模糊匹配结果为 0 或多条时，不进行静默关联，交由调用方/界面处理
+  return "";
 }
 function summarize(assets, records) {
   const alerts = assets
@@ -1354,9 +1595,18 @@ function summarize(assets, records) {
       waterDue: assets.filter((a) => a.reminders?.water?.show).length,
       maintenanceSoon: assets.filter((a) => a.reminders?.maintenance?.show)
         .length,
-      inRepair: assets.filter((a) => a.status === "repair").length,
+      inRepair: assets.filter((a) => a.status === "维修中").length,
     },
   };
+}
+function statusClassName(status) {
+  return {
+    租赁: "lease",
+    月租: "rent",
+    自有: "owned",
+    维修中: "repair",
+    闲置: "idle",
+  }[status] ?? "unknown";
 }
 function rank(level) {
   return { high: 0, medium: 1, low: 2, none: 3 }[level] ?? 4;
@@ -1371,9 +1621,21 @@ function formatDate(v) {
     day: "2-digit",
   }).format(d);
 }
+function formatPurchaseOrdered(value) {
+  if (value === true || value === "true" || value === 1 || value === "1") {
+    return "是";
+  }
+  if (value === false || value === "false" || value === 0 || value === "0") {
+    return "否";
+  }
+  return "";
+}
+function formatCurrency(value) {
+  if (value === null || value === undefined || value === "") return "未设";
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return String(value);
+  return `¥${amount.toLocaleString("zh-CN", { maximumFractionDigits: 2 })}`;
+}
 function sumMaintenanceCost(rows) {
   return rows.reduce((s, r) => s + Number(r.cost || 0), 0);
-}
-function csvCell(v) {
-  return `"${String(v ?? "").replaceAll('"', '""')}"`;
 }

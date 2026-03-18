@@ -7,11 +7,15 @@ create table if not exists public.assets (
   serial_number text not null unique,
   brand text not null,
   supplier text,
-  status text not null check (status in ('lease', 'rent', 'owned', 'repair', 'idle')),
+  status text not null check (status in ('租赁', '月租', '自有', '维修中', '闲置')),
   monthly_rent numeric(12, 2),
+  is_purchase_ordered boolean,
   lease_start_date date,
   lease_end_date date,
   lease_resolution text,
+  operation_requirement text,
+  current_status text,
+  issue_feedback text,
   last_watered_at date,
   water_interval_days integer not null default 14 check (water_interval_days > 0),
   last_maintained_at date,
@@ -20,6 +24,30 @@ create table if not exists public.assets (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table if exists public.assets
+  add column if not exists is_purchase_ordered boolean,
+  add column if not exists operation_requirement text,
+  add column if not exists current_status text,
+  add column if not exists issue_feedback text;
+
+alter table if exists public.assets
+  drop constraint if exists assets_status_check;
+
+update public.assets
+set status = case status
+  when 'lease' then '租赁'
+  when 'rent' then '月租'
+  when 'owned' then '自有'
+  when 'repair' then '维修中'
+  when 'idle' then '闲置'
+  else status
+end
+where status in ('lease', 'rent', 'owned', 'repair', 'idle');
+
+alter table if exists public.assets
+  add constraint assets_status_check
+  check (status in ('租赁', '月租', '自有', '维修中', '闲置'));
 
 create table if not exists public.maintenance_records (
   id uuid primary key default gen_random_uuid(),
