@@ -150,6 +150,12 @@ export async function listOperationLogs({
   return data;
 }
 
+export async function getOperationLogById(id) {
+  const { data, error } = await getSupabaseAdmin().from("operation_logs").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export async function insertOperationLog(log) {
   const { data, error } = await getSupabaseAdmin()
     .from("operation_logs")
@@ -158,4 +164,9 @@ export async function insertOperationLog(log) {
     .single();
   if (error) throw error;
   return data;
+}
+
+export async function deleteOperationLog(id) {
+  const { error } = await getSupabaseAdmin().from("operation_logs").delete().eq("id", id);
+  if (error) throw error;
 }

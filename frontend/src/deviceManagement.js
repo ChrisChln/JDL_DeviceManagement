@@ -1,7 +1,6 @@
 const STORAGE_KEY = "jdl-device-management-items";
 
 export const deviceSeed = {
-  warehouse: "",
   assetCode: "",
   assetType: "",
   sn: "",
@@ -24,7 +23,6 @@ function toPositiveInteger(value) {
 export function validateDevicePayload(payload) {
   const errors = [];
   const device = {
-    warehouse: sanitizeText(payload.warehouse),
     assetCode: sanitizeText(payload.assetCode),
     assetType: sanitizeText(payload.assetType),
     sn: sanitizeText(payload.sn),
@@ -35,9 +33,8 @@ export function validateDevicePayload(payload) {
     department: sanitizeText(payload.department),
   };
 
-  if (!device.warehouse) errors.push("仓库不能为空");
   if (!device.assetCode) errors.push("资产编码不能为空");
-  if (!device.assetType) errors.push("资产类型不能为空");
+  if (!device.assetType) errors.push("资产小类不能为空");
   if (!device.sn) errors.push("SN 不能为空");
   if (!device.brand) errors.push("资产品牌不能为空");
   if (!device.detail) errors.push("资产详单不能为空");
@@ -91,22 +88,21 @@ export function removeDeviceById(devices, id) {
   return devices.filter((item) => item.id !== id);
 }
 
-export function filterDevices(devices, keyword) {
+export function filterDevices(devices, keyword, filters = {}) {
   const query = sanitizeText(keyword).toLowerCase();
-  if (!query) return devices;
+  const assetTypeFilter = sanitizeText(filters.assetType);
+  const locationFilter = sanitizeText(filters.location);
+  const departmentFilter = sanitizeText(filters.department);
+
   return devices.filter((item) =>
-    [
-      item.assetCode,
-      item.assetType,
-      item.sn,
-      item.brand,
-      item.warehouse,
-      item.location,
-      item.department,
-    ].some((field) =>
-      String(field ?? "")
-        .toLowerCase()
-        .includes(query),
-    ),
+    [item.assetCode, item.assetType, item.sn, item.brand, item.location, item.department]
+      .some((field) =>
+        String(field ?? "")
+          .toLowerCase()
+          .includes(query),
+      ) &&
+    (!assetTypeFilter || String(item.assetType ?? "") === assetTypeFilter) &&
+    (!locationFilter || String(item.location ?? "") === locationFilter) &&
+    (!departmentFilter || String(item.department ?? "") === departmentFilter),
   );
 }

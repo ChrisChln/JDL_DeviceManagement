@@ -17,7 +17,6 @@ test("validate required fields and quantity", () => {
 
 test("create a new device record", () => {
   const payload = {
-    warehouse: "上海仓",
     assetCode: "IT-001",
     assetType: "电脑",
     sn: "SN123",
@@ -41,7 +40,6 @@ test("filter and remove devices", () => {
       assetType: "PDA",
       sn: "A",
       brand: "Zebra",
-      warehouse: "北京",
       location: "库位1",
       department: "运营",
     },
@@ -51,12 +49,14 @@ test("filter and remove devices", () => {
       assetType: "电脑",
       sn: "B",
       brand: "HP",
-      warehouse: "上海",
       location: "库位2",
       department: "财务",
     },
   ];
   assert.equal(filterDevices(base, "pda").length, 1);
+  assert.equal(filterDevices(base, "", { assetType: "电脑" }).length, 1);
+  assert.equal(filterDevices(base, "", { location: "库位1" }).length, 1);
+  assert.equal(filterDevices(base, "", { department: "财务" }).length, 1);
   assert.equal(removeDeviceById(base, "1").length, 1);
 });
 

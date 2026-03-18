@@ -89,6 +89,7 @@ export function normalizeAssetPayload(payload) {
   const normalizedStatus = normalizeAssetStatus(payload.status);
   const normalized = {
     warehouse: payload.warehouse || "",
+    department: payload.department || "",
     model: payload.model || "",
     serial_number: payload.serial_number || "",
     brand: payload.brand || "",

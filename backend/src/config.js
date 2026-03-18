@@ -9,7 +9,11 @@ dotenv.config({ path: rootEnvPath });
 
 export const config = {
   port: Number(process.env.PORT || 3101),
-  corsOrigin: process.env.CORS_ORIGIN || "http://localhost:5174",
+  host: process.env.HOST || "0.0.0.0",
+  corsOrigins: (process.env.CORS_ORIGIN || "http://localhost:5174,http://localhost:5173,http://127.0.0.1:5174,http://127.0.0.1:5173")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   supabaseUrl: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "",
   supabaseSecretKey: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "",
 };

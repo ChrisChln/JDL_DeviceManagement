@@ -8,10 +8,12 @@ import {
   removeDeviceById,
   saveDevicesToStorage,
   upsertDevice,
+  validateDevicePayload,
 } from "./deviceManagement.js";
 
 const assetSeed = {
   warehouse: "",
+  department: "",
   model: "",
   serial_number: "",
   brand: "",
@@ -59,8 +61,9 @@ const nav = [
 const statuses = ["租赁", "月租", "自有", "维修中", "闲置"];
 const exportColumns = [
   { header: "仓库", value: (asset) => asset.warehouse ?? "" },
-  { header: "车型", value: (asset) => asset.model ?? "" },
+  { header: "所属部门", value: (asset) => asset.department ?? "" },
   { header: "序列号", value: (asset) => asset.serial_number ?? "" },
+  { header: "车型", value: (asset) => asset.model ?? "" },
   { header: "供应商", value: (asset) => asset.supplier ?? "" },
   { header: "叉车品牌", value: (asset) => asset.brand ?? "" },
   { header: "状态", value: (asset) => asset.status ?? "" },
@@ -95,6 +98,16 @@ const exportColumns = [
   { header: "加水周期", value: (asset) => asset.water_interval_days ?? "" },
   { header: "上次保养日期", value: (asset) => asset.last_maintained_at ?? "" },
   { header: "保养周期", value: (asset) => asset.maintenance_interval_days ?? "" },
+];
+const deviceExportColumns = [
+  { header: "资产编码", value: (device) => device.assetCode ?? "" },
+  { header: "资产小类", value: (device) => device.assetType ?? "" },
+  { header: "SN", value: (device) => device.sn ?? "" },
+  { header: "资产品牌", value: (device) => device.brand ?? "" },
+  { header: "资产详单", value: (device) => device.detail ?? "" },
+  { header: "数量", value: (device) => device.quantity ?? "" },
+  { header: "详细地点", value: (device) => device.location ?? "" },
+  { header: "责任人部门", value: (device) => device.department ?? "" },
 ];
 
 export default function App() {
@@ -131,9 +144,15 @@ export default function App() {
   const [deviceEditingId, setDeviceEditingId] = useState("");
   const [deviceForm, setDeviceForm] = useState(deviceSeed);
   const [deviceSearch, setDeviceSearch] = useState("");
+  const [deviceFilters, setDeviceFilters] = useState({
+    assetType: "",
+    location: "",
+    department: "",
+  });
   const [devices, setDevices] = useState([]);
   const [busy, setBusy] = useState("");
   const fileRef = useRef(null);
+  const deviceFileRef = useRef(null);
 
   useEffect(() => {
     if (!authEnabled) return void setBooting(false);
@@ -202,8 +221,20 @@ export default function App() {
     [assets, filters, assetSort],
   );
   const filteredDevices = useMemo(
-    () => filterDevices(devices, deviceSearch),
-    [devices, deviceSearch],
+    () => filterDevices(devices, deviceSearch, deviceFilters),
+    [devices, deviceSearch, deviceFilters],
+  );
+  const deviceAssetTypes = useMemo(
+    () => uniqueOptions(devices.map((device) => device.assetType)),
+    [devices],
+  );
+  const deviceLocations = useMemo(
+    () => uniqueOptions(devices.map((device) => device.location)),
+    [devices],
+  );
+  const deviceDepartments = useMemo(
+    () => uniqueOptions(devices.map((device) => device.department)),
+    [devices],
   );
 
   const note = (m) => {
@@ -213,22 +244,54 @@ export default function App() {
   };
 
   async function refresh() {
-    try {
-      const [a, r, t, me, logs] = await Promise.all([
-        api.listAssets(),
-        api.listMaintenanceRecords(),
-        api.listTransferRecords(),
-        api.getMe(),
-        api.listOperationLogs(),
-      ]);
-      setAssets(a);
-      setRecords(r);
-      setTransferRecords(t);
-      setProfile(me);
-      setProfileForm({ full_name: me.full_name || "" });
-      setOperationLogs(logs);
-    } catch (e) {
-      note(e.message);
+    const [assetsResult, recordsResult, transfersResult, profileResult, logsResult] = await Promise.allSettled([
+      api.listAssets(),
+      api.listMaintenanceRecords(),
+      api.listTransferRecords(),
+      api.getMe(),
+      api.listOperationLogs(),
+    ]);
+
+    const failures = [];
+
+    if (assetsResult.status === "fulfilled") {
+      setAssets(assetsResult.value);
+    } else {
+      failures.push(`资产：${assetsResult.reason?.message || "加载失败"}`);
+      setAssets([]);
+    }
+
+    if (recordsResult.status === "fulfilled") {
+      setRecords(recordsResult.value);
+    } else {
+      failures.push(`维修：${recordsResult.reason?.message || "加载失败"}`);
+      setRecords([]);
+    }
+
+    if (transfersResult.status === "fulfilled") {
+      setTransferRecords(transfersResult.value);
+    } else {
+      failures.push(`调拨：${transfersResult.reason?.message || "加载失败"}`);
+      setTransferRecords([]);
+    }
+
+    if (profileResult.status === "fulfilled") {
+      setProfile(profileResult.value);
+      setProfileForm({ full_name: profileResult.value.full_name || "" });
+    } else {
+      failures.push(`用户信息：${profileResult.reason?.message || "加载失败"}`);
+      setProfile(null);
+    }
+
+    if (logsResult.status === "fulfilled") {
+      setOperationLogs(logsResult.value);
+    } else {
+      failures.push(`日志：${logsResult.reason?.message || "加载失败"}`);
+      setOperationLogs([]);
+    }
+
+    if (failures.length) {
+      note(failures.slice(0, 2).join("；"));
     }
   }
 
@@ -381,6 +444,19 @@ export default function App() {
       setBusy("");
     }
   }
+  async function undoOperation(id) {
+    if (!window.confirm("确认撤回这条操作记录吗？")) return;
+    try {
+      setBusy(`log-${id}`);
+      await api.undoOperationLog(id);
+      note("操作已撤回");
+      await refresh();
+    } catch (error) {
+      note(error.message);
+    } finally {
+      setBusy("");
+    }
+  }
   async function saveTransfer(e) {
     e.preventDefault();
     try {
@@ -449,6 +525,25 @@ export default function App() {
     );
   }
 
+  function onAssetTemplateDownload() {
+    const XLSX = window.XLSX;
+    if (!XLSX) {
+      note("下载失败：未加载 Excel 导出组件");
+      return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet([], {
+      header: exportColumns.map((column) => column.header),
+    });
+    worksheet["!cols"] = exportColumns.map((column) => ({
+      wch: Math.max(column.header.length + 4, 12),
+    }));
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "资产模板");
+    XLSX.writeFile(workbook, "assets-template.xlsx");
+  }
+
   function openNewDevice() {
     setDeviceEditingId("");
     setDeviceForm(deviceSeed);
@@ -458,7 +553,6 @@ export default function App() {
   function openEditDevice(device) {
     setDeviceEditingId(device.id);
     setDeviceForm({
-      warehouse: device.warehouse,
       assetCode: device.assetCode,
       assetType: device.assetType,
       sn: device.sn,
@@ -487,6 +581,138 @@ export default function App() {
     if (!window.confirm("确认删除这条设备记录吗？")) return;
     setDevices((prev) => removeDeviceById(prev, id));
     note("设备记录已删除");
+  }
+
+  async function onDeviceImport(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const XLSX = window.XLSX;
+    if (!XLSX) {
+      note("导入失败：未加载 Excel 组件");
+      e.target.value = "";
+      return;
+    }
+
+    try {
+      setBusy("device-import");
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const [sheetName] = workbook.SheetNames;
+      if (!sheetName) {
+        note("导入失败：未找到工作表");
+        return;
+      }
+
+      const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
+        defval: "",
+      });
+      if (!rows.length) {
+        note("导入失败：文件内容为空");
+        return;
+      }
+
+      const importedRows = [];
+      const rowErrors = [];
+      for (let index = 0; index < rows.length; index += 1) {
+        const row = rows[index];
+        const payload = {
+          assetCode: row.资产编码,
+          assetType: row.资产小类 || row.资产类型,
+          sn: row.SN || row.Sn || row.sn,
+          brand: row.资产品牌,
+          detail: row.资产详单,
+          quantity: row.数量,
+          location: row.详细地点,
+          department: row.责任人部门,
+        };
+
+        const { errors, device } = validateDevicePayload(payload);
+        if (errors.length) {
+          rowErrors.push(`第 ${index + 2} 行：${errors[0]}`);
+          continue;
+        }
+
+        importedRows.push({
+          ...device,
+          id: `dev-${Date.now().toString(36)}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      if (!importedRows.length) {
+        note(rowErrors[0] || "导入失败：没有有效数据");
+        return;
+      }
+
+      setDevices((prev) => {
+        const merged = new Map(
+          prev.map((item) => [`${item.assetCode}::${item.sn}`, item]),
+        );
+        for (const item of importedRows) {
+          merged.set(`${item.assetCode}::${item.sn}`, item);
+        }
+        return Array.from(merged.values());
+      });
+
+      note(
+        rowErrors.length
+          ? `已导入 ${importedRows.length} 条，跳过 ${rowErrors.length} 条`
+          : `已导入 ${importedRows.length} 条设备记录`,
+      );
+    } catch (error) {
+      note(error.message || "导入失败");
+    } finally {
+      setBusy("");
+      e.target.value = "";
+    }
+  }
+
+  function onDeviceExport() {
+    const XLSX = window.XLSX;
+    if (!XLSX) {
+      note("导出失败：未加载 Excel 导出组件");
+      return;
+    }
+
+    const sheetRows = filteredDevices.map((device) =>
+      Object.fromEntries(
+        deviceExportColumns.map((column) => [column.header, column.value(device)]),
+      ),
+    );
+
+    const worksheet = XLSX.utils.json_to_sheet(sheetRows, {
+      header: deviceExportColumns.map((column) => column.header),
+    });
+    worksheet["!cols"] = deviceExportColumns.map((column) => ({
+      wch: Math.max(column.header.length + 4, 12),
+    }));
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "设备管理");
+    XLSX.writeFile(
+      workbook,
+      `devices-${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
+  }
+
+  function onDeviceTemplateDownload() {
+    const XLSX = window.XLSX;
+    if (!XLSX) {
+      note("下载失败：未加载 Excel 导出组件");
+      return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet([], {
+      header: deviceExportColumns.map((column) => column.header),
+    });
+    worksheet["!cols"] = deviceExportColumns.map((column) => ({
+      wch: Math.max(column.header.length + 4, 12),
+    }));
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "设备模板");
+    XLSX.writeFile(workbook, "devices-template.xlsx");
   }
 
   if (booting)
@@ -610,6 +836,7 @@ export default function App() {
             fileRef={fileRef}
             onImport={onImport}
             onExport={onExport}
+            onTemplateDownload={onAssetTemplateDownload}
             onCreate={openNewAsset}
             onEdit={openEditAsset}
             onWater={(a) => mark(a.id, "water")}
@@ -639,6 +866,16 @@ export default function App() {
             total={devices.length}
             search={deviceSearch}
             setSearch={setDeviceSearch}
+            filters={deviceFilters}
+            setFilters={setDeviceFilters}
+            assetTypeOptions={deviceAssetTypes}
+            locationOptions={deviceLocations}
+            departmentOptions={deviceDepartments}
+            busy={busy}
+            fileRef={deviceFileRef}
+            onImport={onDeviceImport}
+            onExport={onDeviceExport}
+            onTemplateDownload={onDeviceTemplateDownload}
             onCreate={openNewDevice}
             onEdit={openEditDevice}
             onDelete={removeDevice}
@@ -662,6 +899,8 @@ export default function App() {
             session={session}
             profile={profile}
             rows={operationLogs}
+            busy={busy}
+            onUndo={undoOperation}
             onSignOut={signOut}
           />
         )}
@@ -864,13 +1103,11 @@ function Dashboard({ session, profile, dashboard, onRefresh, onSignOut }) {
       <section className="page-body">
         <div className="page-heading">
           <h2>首页总览</h2>
-          <p>实时查看固定资产提醒与运行状态。</p>
         </div>
         <div className="dash-hero">
           <div>
             <small>核心提醒引擎</small>
             <h3>{dashboard.alerts.length} 条待处理提醒</h3>
-            <p>租赁到期、加水、保养提醒会按紧急程度自动排序。</p>
           </div>
           <div className="dash-side">
             <div>
@@ -960,6 +1197,7 @@ function Assets({
   fileRef,
   onImport,
   onExport,
+  onTemplateDownload,
   onCreate,
   onEdit,
   onWater,
@@ -982,9 +1220,7 @@ function Assets({
       <section className="page-body">
         <div className="records-heading">
           <div>
-            <p>SWISS TIER 1 MANAGEMENT</p>
             <h1>资产台账</h1>
-            <span>精确管理叉车及其他特种设备。</span>
           </div>
           <div className="records-head-actions">
             <input
@@ -999,6 +1235,13 @@ function Assets({
             </button>
             <button className="ui-ghost" onClick={onExport} type="button">
               导出
+            </button>
+            <button
+              className="ui-ghost"
+              onClick={onTemplateDownload}
+              type="button"
+            >
+              下载模板
             </button>
             <button
               className="ui-ghost"
@@ -1030,12 +1273,9 @@ function Assets({
                 onChange={(e) =>
                   setFilters((s) => ({ ...s, search: e.target.value }))
                 }
-                placeholder="搜索序列号、品牌、车型"
+                placeholder="搜索序列号、品牌、车型、所属部门"
               />
             </div>
-            <span className="filter-stat">
-              当前显示 {rows.length} / {assets.length}
-            </span>
           </div>
           <div className="filter-grid">
             <label className="filter-field">
@@ -1133,10 +1373,9 @@ function Assets({
                     仓库
                   </button>
                 </th>
-                <th>序列号</th>
+                <th>所属部门</th>
                 <th>车型</th>
-                <th>供应商</th>
-                <th>叉车品牌</th>
+                <th>序列号</th>
                 <th>
                   <button
                     className={`asset-head-button${assetSort === "lease" ? " active" : ""}`}
@@ -1164,6 +1403,8 @@ function Assets({
                     保养提醒
                   </button>
                 </th>
+                <th>供应商</th>
+                <th>叉车品牌</th>
                 <th>状态</th>
                 <th>操作</th>
               </tr>
@@ -1172,10 +1413,9 @@ function Assets({
               {rows.map((a) => (
                 <tr key={a.id}>
                   <td>{a.warehouse}</td>
-                  <td className="strong-cell">{a.serial_number}</td>
+                  <td>{a.department || "-"}</td>
                   <td>{a.model}</td>
-                  <td>{a.supplier || "无供应商"}</td>
-                  <td>{a.brand}</td>
+                  <td className="strong-cell">{a.serial_number}</td>
                   <td>{chip("到期", a.reminders.lease, a.lease_end_date)}</td>
                   <td>
                     {chip(
@@ -1195,6 +1435,8 @@ function Assets({
                       busy === `maintain-${a.id}`,
                     )}
                   </td>
+                  <td>{a.supplier || "无供应商"}</td>
+                  <td>{a.brand}</td>
                   <td>
                     <span className={`status-tag ${statusClassName(a.status)}`}>
                       {a.status}
@@ -1225,7 +1467,7 @@ function Assets({
               ))}
               {!rows.length && (
                 <tr>
-                  <td colSpan="10">
+                  <td colSpan="11">
                     <div className="empty-state">没有找到资产。</div>
                   </td>
                 </tr>
@@ -1245,6 +1487,16 @@ function DeviceManagement({
   total,
   search,
   setSearch,
+  filters,
+  setFilters,
+  assetTypeOptions,
+  locationOptions,
+  departmentOptions,
+  busy,
+  fileRef,
+  onImport,
+  onExport,
+  onTemplateDownload,
   onCreate,
   onEdit,
   onDelete,
@@ -1263,36 +1515,107 @@ function DeviceManagement({
       <section className="page-body">
         <div className="records-heading">
           <div>
-            <p>SMART DEVICE OPERATIONS</p>
             <h1>设备管理</h1>
-            <span>管理电脑、PDA 等小型设备，确保资产去向清晰可追踪。</span>
           </div>
           <div className="records-head-actions">
+            <input
+              ref={fileRef}
+              className="hidden-input"
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={onImport}
+            />
+            <button className="ui-ghost" onClick={onExport} type="button">
+              导出
+            </button>
+            <button
+              className="ui-ghost"
+              onClick={onTemplateDownload}
+              type="button"
+            >
+              下载模板
+            </button>
+            <button
+              className="ui-ghost"
+              onClick={() => fileRef.current?.click()}
+              type="button"
+              disabled={busy === "device-import"}
+            >
+              {busy === "device-import" ? "导入中..." : "导入"}
+            </button>
             <button className="ui-primary" onClick={onCreate} type="button">
               新增设备
             </button>
           </div>
         </div>
-        <div className="filters-bar">
-          <div className="filter-search">
-            <span className="material-symbols-outlined">search</span>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="资产编码、SN、品牌、部门..."
-            />
+        <div className="filters-bar device-filters-bar">
+          <div className="filter-primary">
+            <div className="filter-search">
+              <span className="material-symbols-outlined">search</span>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="资产编码、SN、品牌、部门..."
+              />
+            </div>
           </div>
-          <span>
-            当前显示 {rows.length} / {total}
-          </span>
+          <div className="filter-grid device-filter-grid">
+            <label className="filter-field">
+              <span>资产小类</span>
+              <select
+                value={filters.assetType}
+                onChange={(e) =>
+                  setFilters((prev) => ({ ...prev, assetType: e.target.value }))
+                }
+              >
+                <option value="">全部资产小类</option>
+                {assetTypeOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filter-field">
+              <span>详细地点</span>
+              <select
+                value={filters.location}
+                onChange={(e) =>
+                  setFilters((prev) => ({ ...prev, location: e.target.value }))
+                }
+              >
+                <option value="">全部详细地点</option>
+                {locationOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filter-field">
+              <span>责任人部门</span>
+              <select
+                value={filters.department}
+                onChange={(e) =>
+                  setFilters((prev) => ({ ...prev, department: e.target.value }))
+                }
+              >
+                <option value="">全部责任人部门</option>
+                {departmentOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
         <div className="table-shell">
           <table className="grid-table device-table">
             <thead>
               <tr>
-                <th>仓库</th>
                 <th>资产编码</th>
-                <th>资产类型</th>
+                <th>资产小类</th>
                 <th>SN</th>
                 <th>资产品牌</th>
                 <th>资产详单</th>
@@ -1305,7 +1628,6 @@ function DeviceManagement({
             <tbody>
               {rows.map((device) => (
                 <tr key={device.id}>
-                  <td>{device.warehouse}</td>
                   <td>
                     <strong>{device.assetCode}</strong>
                   </td>
@@ -1334,7 +1656,7 @@ function DeviceManagement({
               ))}
               {!rows.length && (
                 <tr>
-                  <td colSpan="10">
+                  <td colSpan="9">
                     <div className="empty-state">暂无设备记录。</div>
                   </td>
                 </tr>
@@ -1405,9 +1727,7 @@ function Transfers({
       <section className="page-body">
         <div className="records-heading">
           <div>
-            <p>WAREHOUSE TRANSFER FLOW</p>
             <h1>资产调拨</h1>
-            <span>管理仓库内资产调拨，完成后自动更新资产所在仓库并沉淀调拨记录。</span>
           </div>
           <div className="records-head-actions">
             <button className="ui-primary" onClick={onCreate} type="button">
@@ -1420,7 +1740,7 @@ function Transfers({
           {metric("calendar_month", "本月调拨", monthCount, "orange")}
           {metric("inventory_2", "可调拨资产", assets.length, "blue")}
         </div>
-        <div className="filters-bar">
+        <div className="filters-bar transfer-filters-bar">
           <div className="filter-primary">
             <div className="filter-search">
               <span className="material-symbols-outlined">search</span>
@@ -1430,9 +1750,6 @@ function Transfers({
                 placeholder="搜索调拨单号、序列号、设备名"
               />
             </div>
-            <span className="filter-stat">
-              当前显示 {filteredRows.length} / {rows.length}
-            </span>
           </div>
           <div className="filter-grid transfer-filter-grid">
             <label className="filter-field">
@@ -1484,8 +1801,8 @@ function Transfers({
                 <tr key={row.id}>
                   <td className="strong-cell">{row.transfer_no}</td>
                   <td>{row.asset_serial_number}</td>
+                  <td>{a.model}</td>
                   <td>{row.asset_model}</td>
-                  <td>{row.asset_brand}</td>
                   <td>{row.from_warehouse}</td>
                   <td>{row.to_warehouse}</td>
                   <td>{row.requested_by_name}</td>
@@ -1564,9 +1881,9 @@ function Maintenance({
           {metric(
             "payments",
             "年度费用",
-            Intl.NumberFormat("zh-CN", {
+            Intl.NumberFormat("en-US", {
               style: "currency",
-              currency: "CNY",
+              currency: "USD",
               maximumFractionDigits: 2,
             }).format(sumMaintenanceCost(filteredRows)),
             "orange",
@@ -1578,7 +1895,7 @@ function Maintenance({
             "green",
           )}
         </div>
-        <div className="filters-bar">
+        <div className="filters-bar maintenance-filters-bar">
           <div className="filter-primary">
             <div className="filter-search">
               <span className="material-symbols-outlined">search</span>
@@ -1588,7 +1905,6 @@ function Maintenance({
                 placeholder="搜索序列号、设备名"
               />
             </div>
-            <div className="filter-stat">当前显示 {filteredRows.length} / {rows.length}</div>
           </div>
           <div className="filter-grid maintenance-filter-grid">
             <label className="filter-field">
@@ -1683,7 +1999,7 @@ function Maintenance({
   );
 }
 
-function OperationLogs({ session, profile, rows, onSignOut }) {
+function OperationLogs({ session, profile, rows, busy, onUndo, onSignOut }) {
   return (
     <>
       <header className="records-top no-search">
@@ -1698,7 +2014,6 @@ function OperationLogs({ session, profile, rows, onSignOut }) {
         <div className="records-heading">
           <div>
             <h1>操作日志</h1>
-            <span>记录资产与维修相关操作，显示首次填写的用户全名。</span>
           </div>
         </div>
         <div className="table-shell">
@@ -1711,6 +2026,7 @@ function OperationLogs({ session, profile, rows, onSignOut }) {
                 <th>类型</th>
                 <th>对象</th>
                 <th>详情</th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody>
@@ -1725,11 +2041,22 @@ function OperationLogs({ session, profile, rows, onSignOut }) {
                   <td>{row.target_type}</td>
                   <td>{row.target_label || "-"}</td>
                   <td>{row.details || "-"}</td>
+                  <td>
+                    <button
+                      className="ui-ghost danger-line maintenance-delete"
+                      onClick={() => onUndo(row.id)}
+                      type="button"
+                      disabled={busy === `log-${row.id}` || !row.rollbackable}
+                      title={row.rollbackable ? "回滚此操作" : "该记录不支持回滚"}
+                    >
+                      {busy === `log-${row.id}` ? "回滚中..." : "回滚"}
+                    </button>
+                  </td>
                 </tr>
               ))}
               {!rows.length && (
                 <tr>
-                  <td colSpan="6">
+                  <td colSpan="7">
                     <div className="empty-state">暂无操作日志。</div>
                   </td>
                 </tr>
@@ -1833,9 +2160,8 @@ function deviceFields(state, setState) {
 
   return (
     <>
-      {field("仓库", <input {...bind("warehouse")} required />)}
       {field("资产编码", <input {...bind("assetCode")} required />)}
-      {field("资产类型", <input {...bind("assetType")} required />)}
+      {field("资产小类", <input {...bind("assetType")} required />)}
       {field("SN", <input {...bind("sn")} required />)}
       {field("资产品牌", <input {...bind("brand")} required />)}
       {field("资产详单", <input {...bind("detail")} required />)}
@@ -1857,6 +2183,7 @@ function assetFields(state, setState) {
   return (
     <>
       {field("仓库", <input {...bind("warehouse")} required />)}
+      {field("所属部门", <input {...bind("department")} />)}
       {field("车型", <input {...bind("model")} required />)}
       {field("序列号", <input {...bind("serial_number")} required />)}
       {field("叉车品牌", <input {...bind("brand")} required />)}
@@ -1951,7 +2278,6 @@ function TransferFields({ state, setState, assets, warehouses }) {
         <div className="transfer-pane-head">
           <div>
             <h4>选择设备</h4>
-            <span>先锁定调出仓库，再批量选择需要调拨的设备。</span>
           </div>
           <span className="transfer-count-pill">已选 {selectedAssets.length} 台</span>
         </div>
@@ -2049,7 +2375,6 @@ function TransferFields({ state, setState, assets, warehouses }) {
         <div className="transfer-pane-head">
           <div>
             <h4>调拨详情</h4>
-            <span>确认目标仓库、调拨原因和补充说明。</span>
           </div>
         </div>
         <div className="transfer-selected-list">
@@ -2097,7 +2422,6 @@ function TransferFields({ state, setState, assets, warehouses }) {
               setState((prev) => ({ ...prev, reason: e.target.value }))
             }
             required
-            placeholder="例如：波次高峰支援、车型调整、临时借调"
           />
         </label>
         <label className="full-width">
@@ -2108,7 +2432,6 @@ function TransferFields({ state, setState, assets, warehouses }) {
             onChange={(e) =>
               setState((prev) => ({ ...prev, note: e.target.value }))
             }
-            placeholder="补充调拨背景、接收人、预计使用时间等"
           />
         </label>
       </div>
@@ -2203,7 +2526,7 @@ function filterAsset(a, f) {
   const statusQuery = f.status.trim();
   const s =
     !q ||
-    [a.serial_number, a.brand, a.model, a.warehouse, a.supplier].some((v) =>
+    [a.serial_number, a.brand, a.model, a.warehouse, a.department, a.supplier].some((v) =>
       String(v || "")
         .toLowerCase()
         .includes(q),
