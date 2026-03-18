@@ -65,7 +65,7 @@ app.post("/api/me/profile", async (req, res, next) => {
     }
 
     const existing = await getUserProfile(req.user.id);
-    if (existing) {
+    if (existing && typeof existing.full_name === "string" && existing.full_name.trim() !== "") {
       return res.json({
         id: req.user.id,
         email: req.user.email,
