@@ -1,4 +1,32 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3101";
+const DEFAULT_API_BASE =
+  typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:3101`
+    : "http://localhost:3101";
+
+function resolveApiBase() {
+  const configured = (import.meta.env.VITE_API_BASE_URL || "").trim();
+  if (!configured || typeof window === "undefined") {
+    return configured || DEFAULT_API_BASE;
+  }
+
+  try {
+    const parsed = new URL(configured);
+    const isLoopback = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+    const isClientLoopback =
+      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
+    if (isLoopback && !isClientLoopback) {
+      parsed.hostname = window.location.hostname;
+      return parsed.toString().replace(/\/$/, "");
+    }
+  } catch {
+    return DEFAULT_API_BASE;
+  }
+
+  return configured;
+}
+
+const API_BASE = resolveApiBase();
 let accessToken = "";
 
 export function setAccessToken(token) {
@@ -33,6 +61,7 @@ export const api = {
   saveProfile: (payload) =>
     request("/api/me/profile", { method: "POST", body: JSON.stringify(payload) }),
   listOperationLogs: () => request("/api/operation-logs"),
+  undoOperationLog: (id) => request(`/api/operation-logs/${id}/rollback`, { method: "POST" }),
   getDashboard: () => request("/api/dashboard"),
   listAssets: () => request("/api/assets"),
   createAsset: (payload) => request("/api/assets", { method: "POST", body: JSON.stringify(payload) }),
