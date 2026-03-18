@@ -253,12 +253,12 @@ using (true)
 with check (true);
 
 drop policy if exists "Allow authenticated access to operation_logs" on public.operation_logs;
-create policy "Allow authenticated access to operation_logs"
+create policy "Allow authenticated read access to operation_logs"
 on public.operation_logs
-for all
+for select
 to authenticated
-using (true)
-with check (true);
+using (true);
+
 
 create or replace view public.asset_alerts as
 select
