@@ -245,12 +245,18 @@ using (true)
 with check (true);
 
 drop policy if exists "Allow authenticated access to user_profiles" on public.user_profiles;
-create policy "Allow authenticated access to user_profiles"
+create policy "Users can view own user_profile"
 on public.user_profiles
-for all
+for select
 to authenticated
-using (true)
-with check (true);
+using (user_id = auth.uid());
+
+create policy "Users can update own user_profile"
+on public.user_profiles
+for update
+to authenticated
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
 
 drop policy if exists "Allow authenticated access to operation_logs" on public.operation_logs;
 create policy "Allow authenticated read access to operation_logs"
