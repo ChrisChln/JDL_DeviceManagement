@@ -341,6 +341,7 @@ app.post("/api/transfer-records", async (req, res, next) => {
         target_type: "调拨记录",
         target_label: `${transfer.transfer_no} · ${transfer.asset_serial_number}`,
         details: `${transfer.from_warehouse} → ${transfer.to_warehouse}`,
+        actorName: requestedByName,
       });
     }
 
