@@ -107,11 +107,45 @@ export async function createUserProfile(profile) {
   return data;
 }
 
-export async function listOperationLogs() {
-  const { data, error } = await getSupabaseAdmin()
+export async function listOperationLogs({
+  page = 1,
+  pageSize = 100,
+  from,
+  to,
+  action,
+  actorId,
+} = {}) {
+  // Ensure page and pageSize are within reasonable bounds to keep responses bounded
+  const safePage = Math.max(1, Number.isFinite(page) ? Math.floor(page) : 1);
+  const maxPageSize = 1000;
+  const rawPageSize = Number.isFinite(pageSize) ? Math.floor(pageSize) : 100;
+  const safePageSize = Math.min(Math.max(1, rawPageSize), maxPageSize);
+  const fromIndex = (safePage - 1) * safePageSize;
+  const toIndex = fromIndex + safePageSize - 1;
+
+  let query = getSupabaseAdmin()
     .from("operation_logs")
-    .select("*")
-    .order("created_at", { ascending: false });
+    .select("*");
+
+  if (from) {
+    query = query.gte("created_at", from);
+  }
+
+  if (to) {
+    query = query.lte("created_at", to);
+  }
+
+  if (action) {
+    query = query.eq("action", action);
+  }
+
+  if (actorId) {
+    query = query.eq("actor_id", actorId);
+  }
+
+  const { data, error } = await query
+    .order("created_at", { ascending: false })
+    .range(fromIndex, toIndex);
   if (error) throw error;
   return data;
 }
