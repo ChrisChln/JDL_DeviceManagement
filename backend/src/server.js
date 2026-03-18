@@ -5,11 +5,19 @@ import XLSX from "xlsx";
 import { requireAuth } from "./auth-middleware.js";
 import { config } from "./config.js";
 import {
+  createAssetTransfer,
+  createUserProfile,
   deleteAsset,
   deleteMaintenanceRecord,
+  getAssetById,
+  getMaintenanceRecordById,
+  getUserProfile,
   insertMaintenanceRecord,
+  insertOperationLog,
   listAssets,
   listMaintenanceRecords,
+  listOperationLogs,
+  listTransferRecords,
   updateAsset,
   upsertAsset,
 } from "./repository.js";
@@ -33,10 +41,68 @@ app.get("/health", (_req, res) => {
 app.use("/api", requireAuth);
 
 app.get("/api/me", (req, res) => {
-  res.json({
-    id: req.user.id,
-    email: req.user.email,
-  });
+  getUserProfile(req.user.id)
+    .then((profile) => {
+      res.json({
+        id: req.user.id,
+        email: req.user.email,
+        full_name: profile?.full_name || "",
+      });
+    })
+    .catch((error) => {
+      res.status(500).json({ message: error.message || "Internal server error" });
+    });
+});
+
+app.post("/api/me/profile", async (req, res, next) => {
+  try {
+    const fullName = String(req.body?.full_name || "").trim();
+    if (!fullName) {
+      return res.status(400).json({ message: "请输入用户全名" });
+    }
+    if (fullName.length > 60) {
+      return res.status(400).json({ message: "用户全名不能超过 60 个字符" });
+    }
+
+    const existing = await getUserProfile(req.user.id);
+    if (existing && typeof existing.full_name === "string" && existing.full_name.trim() !== "") {
+      return res.json({
+        id: req.user.id,
+        email: req.user.email,
+        full_name: existing.full_name,
+      });
+    }
+
+    const profile = await createUserProfile({
+      user_id: req.user.id,
+      email: req.user.email || "",
+      full_name: fullName,
+    });
+
+    await safeLogOperation(req, {
+      action: "首次填写用户全名",
+      target_type: "用户资料",
+      target_label: fullName,
+      details: "完成首次登录资料设置",
+      actorNameOverride: fullName,
+    });
+
+    res.status(201).json({
+      id: req.user.id,
+      email: req.user.email,
+      full_name: profile.full_name,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/operation-logs", async (_req, res, next) => {
+  try {
+    res.json(await listOperationLogs());
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.get("/api/dashboard", async (_req, res, next) => {
@@ -71,6 +137,12 @@ app.get("/api/assets", async (_req, res, next) => {
 app.post("/api/assets", async (req, res, next) => {
   try {
     const asset = await upsertAsset(normalizeAssetPayload(req.body));
+    await safeLogOperation(req, {
+      action: "创建资产",
+      target_type: "资产",
+      target_label: `${asset.serial_number} · ${asset.model}`,
+      details: `${asset.warehouse} / ${asset.status}`,
+    });
     res.status(201).json(computeAssetStatus(asset));
   } catch (error) {
     next(error);
@@ -80,6 +152,12 @@ app.post("/api/assets", async (req, res, next) => {
 app.put("/api/assets/:id", async (req, res, next) => {
   try {
     const asset = await upsertAsset({ ...normalizeAssetPayload(req.body), id: req.params.id });
+    await safeLogOperation(req, {
+      action: "更新资产",
+      target_type: "资产",
+      target_label: `${asset.serial_number} · ${asset.model}`,
+      details: `${asset.warehouse} / ${asset.status}`,
+    });
     res.json(computeAssetStatus(asset));
   } catch (error) {
     next(error);
@@ -88,7 +166,14 @@ app.put("/api/assets/:id", async (req, res, next) => {
 
 app.delete("/api/assets/:id", async (req, res, next) => {
   try {
+    const asset = await getAssetById(req.params.id);
     await deleteAsset(req.params.id);
+    await safeLogOperation(req, {
+      action: "删除资产",
+      target_type: "资产",
+      target_label: asset ? `${asset.serial_number} · ${asset.model}` : req.params.id,
+      details: asset?.warehouse || "",
+    });
     res.status(204).send();
   } catch (error) {
     next(error);
@@ -98,6 +183,12 @@ app.delete("/api/assets/:id", async (req, res, next) => {
 app.post("/api/assets/:id/mark-watered", async (req, res, next) => {
   try {
     const asset = await updateAsset(req.params.id, { last_watered_at: formatDateInput(new Date()) });
+    await safeLogOperation(req, {
+      action: "更新加水日期",
+      target_type: "资产",
+      target_label: `${asset.serial_number} · ${asset.model}`,
+      details: asset.last_watered_at || formatDateInput(new Date()),
+    });
     res.json(computeAssetStatus(asset));
   } catch (error) {
     next(error);
@@ -107,6 +198,12 @@ app.post("/api/assets/:id/mark-watered", async (req, res, next) => {
 app.post("/api/assets/:id/mark-maintained", async (req, res, next) => {
   try {
     const asset = await updateAsset(req.params.id, { last_maintained_at: formatDateInput(new Date()) });
+    await safeLogOperation(req, {
+      action: "更新保养日期",
+      target_type: "资产",
+      target_label: `${asset.serial_number} · ${asset.model}`,
+      details: asset.last_maintained_at || formatDateInput(new Date()),
+    });
     res.json(computeAssetStatus(asset));
   } catch (error) {
     next(error);
@@ -157,6 +254,13 @@ app.post("/api/assets/import", upload.single("file"), async (req, res, next) => 
       }
     }
 
+    await safeLogOperation(req, {
+      action: "导入资产",
+      target_type: "资产",
+      target_label: `共 ${results.length} 条`,
+      details: `文件：${req.file.originalname}`,
+    });
+
     res.status(201).json({ count: results.length });
   } catch (error) {
     next(error);
@@ -171,9 +275,92 @@ app.get("/api/maintenance-records", async (_req, res, next) => {
   }
 });
 
+app.get("/api/transfer-records", async (_req, res, next) => {
+  try {
+    res.json(await listTransferRecords());
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/transfer-records", async (req, res, next) => {
+  try {
+    const profile = await getUserProfile(req.user.id);
+    const requestedByName =
+      profile?.full_name || req.user.email?.split("@")[0] || "用户";
+    const assetIds = Array.isArray(req.body?.asset_ids)
+      ? [...new Set(req.body.asset_ids.map((item) => String(item).trim()).filter(Boolean))]
+      : [];
+    const toWarehouse = String(req.body?.to_warehouse || "").trim();
+    const reason = String(req.body?.reason || "").trim();
+    const note = String(req.body?.note || "").trim();
+
+    if (!assetIds.length) {
+      return res.status(400).json({ message: "请至少选择一台需要调拨的设备" });
+    }
+
+    if (!toWarehouse) {
+      return res.status(400).json({ message: "请选择调入仓库" });
+    }
+
+    if (!reason) {
+      return res.status(400).json({ message: "请填写调拨原因" });
+    }
+
+    const selectedAssets = await Promise.all(assetIds.map((assetId) => getAssetById(assetId)));
+    const missing = selectedAssets.some((asset) => !asset);
+    if (missing) {
+      return res.status(400).json({ message: "部分设备不存在或已被删除" });
+    }
+
+    const sourceWarehouse = selectedAssets[0].warehouse;
+    if (toWarehouse === sourceWarehouse) {
+      return res.status(400).json({ message: "调入仓库不能与当前仓库相同" });
+    }
+    const mixedWarehouse = selectedAssets.some(
+      (asset) => asset.warehouse !== sourceWarehouse,
+    );
+    if (mixedWarehouse) {
+      return res.status(400).json({ message: "一次调拨只能选择同一仓库下的设备" });
+    }
+
+    const transfers = [];
+    for (const assetId of assetIds) {
+      const transfer = await createAssetTransfer({
+        asset_id: assetId,
+        to_warehouse: toWarehouse,
+        requested_by_user_id: req.user.id,
+        requested_by_name: requestedByName,
+        reason,
+        note,
+      });
+      transfers.push(transfer);
+
+      await safeLogOperation(req, {
+        action: "资产调拨",
+        target_type: "调拨记录",
+        target_label: `${transfer.transfer_no} · ${transfer.asset_serial_number}`,
+        details: `${transfer.from_warehouse} → ${transfer.to_warehouse}`,
+        actorName: requestedByName,
+      });
+    }
+
+    res.status(201).json({ count: transfers.length, records: transfers });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/maintenance-records", async (req, res, next) => {
   try {
     const record = await insertMaintenanceRecord(normalizeMaintenancePayload(req.body));
+    const asset = await getAssetById(record.asset_id);
+    await safeLogOperation(req, {
+      action: "创建维修记录",
+      target_type: "维修记录",
+      target_label: asset ? `${asset.serial_number} · ${asset.model}` : record.asset_id,
+      details: record.issue_description,
+    });
     res.status(201).json(record);
   } catch (error) {
     next(error);
@@ -182,7 +369,15 @@ app.post("/api/maintenance-records", async (req, res, next) => {
 
 app.delete("/api/maintenance-records/:id", async (req, res, next) => {
   try {
+    const record = await getMaintenanceRecordById(req.params.id);
+    const asset = record?.asset_id ? await getAssetById(record.asset_id) : null;
     await deleteMaintenanceRecord(req.params.id);
+    await safeLogOperation(req, {
+      action: "删除维修记录",
+      target_type: "维修记录",
+      target_label: asset ? `${asset.serial_number} · ${asset.model}` : req.params.id,
+      details: record?.issue_description || "",
+    });
     res.status(204).send();
   } catch (error) {
     next(error);
@@ -235,4 +430,26 @@ function makeAlert(type, asset, reminder, subtitle) {
 
 function rankLevel(level) {
   return { high: 0, medium: 1, low: 2, none: 3 }[level] ?? 4;
+}
+
+async function safeLogOperation(req, payload) {
+  try {
+    const profile = await getUserProfile(req.user.id);
+    const actorName =
+      payload.actorNameOverride ||
+      profile?.full_name ||
+      req.user.email?.split("@")[0] ||
+      "用户";
+    await insertOperationLog({
+      actor_user_id: req.user.id,
+      actor_name: actorName,
+      actor_email: req.user.email || "",
+      action: payload.action,
+      target_type: payload.target_type,
+      target_label: payload.target_label || "",
+      details: payload.details || "",
+    });
+  } catch (error) {
+    console.error("Failed to write operation log", error);
+  }
 }

@@ -30,6 +30,9 @@ async function request(path, options = {}) {
 
 export const api = {
   getMe: () => request("/api/me"),
+  saveProfile: (payload) =>
+    request("/api/me/profile", { method: "POST", body: JSON.stringify(payload) }),
+  listOperationLogs: () => request("/api/operation-logs"),
   getDashboard: () => request("/api/dashboard"),
   listAssets: () => request("/api/assets"),
   createAsset: (payload) => request("/api/assets", { method: "POST", body: JSON.stringify(payload) }),
@@ -46,4 +49,7 @@ export const api = {
   createMaintenanceRecord: (payload) =>
     request("/api/maintenance-records", { method: "POST", body: JSON.stringify(payload) }),
   deleteMaintenanceRecord: (id) => request(`/api/maintenance-records/${id}`, { method: "DELETE" }),
+  listTransferRecords: () => request("/api/transfer-records"),
+  createTransferRecord: (payload) =>
+    request("/api/transfer-records", { method: "POST", body: JSON.stringify(payload) }),
 };
