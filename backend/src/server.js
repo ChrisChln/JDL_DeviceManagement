@@ -299,6 +299,14 @@ app.post("/api/transfer-records", async (req, res, next) => {
       return res.status(400).json({ message: "请至少选择一台需要调拨的设备" });
     }
 
+    if (!toWarehouse) {
+      return res.status(400).json({ message: "请选择调入仓库" });
+    }
+
+    if (!reason) {
+      return res.status(400).json({ message: "请填写调拨原因" });
+    }
+
     const selectedAssets = await Promise.all(assetIds.map((assetId) => getAssetById(assetId)));
     const missing = selectedAssets.some((asset) => !asset);
     if (missing) {
@@ -306,6 +314,9 @@ app.post("/api/transfer-records", async (req, res, next) => {
     }
 
     const sourceWarehouse = selectedAssets[0].warehouse;
+    if (toWarehouse === sourceWarehouse) {
+      return res.status(400).json({ message: "调入仓库不能与当前仓库相同" });
+    }
     const mixedWarehouse = selectedAssets.some(
       (asset) => asset.warehouse !== sourceWarehouse,
     );
