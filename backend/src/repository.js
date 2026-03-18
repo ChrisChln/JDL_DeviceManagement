@@ -52,11 +52,12 @@ export async function getMaintenanceRecordById(id) {
   return data;
 }
 
-export async function listTransferRecords() {
+export async function listTransferRecords({ limit = 100, offset = 0 } = {}) {
   const { data, error } = await getSupabaseAdmin()
     .from("transfer_records")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
   if (error) throw error;
   return data;
 }
